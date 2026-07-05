@@ -3,231 +3,226 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { TimeRecordModal } from '@/components/modals/time-record-modal';
-import { HabitUpdateModal } from '@/components/modals/habit-update-modal';
-import { BookRecordModal } from '@/components/modals/book-record-modal';
-import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
-import { AccountRecordModal } from '@/components/modals/account-record-modal';
-import { useData } from '@/components/providers/data-provider';
-import type { CalendarDayData } from '@/types';
-import type { TimeRecord, HabitDaily, AccountRecord } from '@/types';
-import { TIME_CATEGORIES, HABIT_CONFIGS } from '@/types';
-import { useState } from 'react';
+import type { TimeRecord, HabitRecord, AccountRecord, FirstCategory } from '@/types';
+import { getCategoryColor, HABIT_CONFIG } from '@/types';
 
 interface DayDetailModalProps {
-  isOpen: boolean;
+  date: string;
+  timeRecords: TimeRecord[];
+  habits: HabitRecord | null;
+  accountRecords: AccountRecord[];
   onClose: () => void;
-  dayData: CalendarDayData | null;
 }
 
-export function DayDetailModal({ isOpen, onClose, dayData }: DayDetailModalProps) {
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-  const { updateHabitProgress } = useData();
+export function DayDetailModal({
+  date,
+  timeRecords,
+  habits,
+  accountRecords,
+  onClose
+}: DayDetailModalProps) {
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    return `${d.getMonth() + 1}月${d.getDate()}日 周${weekdays[d.getDay()]}`;
+  };
 
-  if (!dayData) return null;
+  const formatTime = (isoStr: string) => {
+    const d = new Date(isoStr);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
 
-  const date = new Date(dayData.date);
-  const dateDisplay = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-  const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+  const totalMinutes = timeRecords.reduce((sum, r) => sum + r.duration, 0);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainMinutes = totalMinutes % 60;
+
+  // 分类统计
+  const categoryStats: Record<string, number> = {};
+  timeRecords.forEach(r => {
+    categoryStats[r.firstCategory] = (categoryStats[r.firstCategory] || 0) + r.duration;
+  });
+
+  // 收支统计
+  const incomeTotal = accountRecords
+    .filter(a => a.type === 'income')
+    .reduce((sum, a) => sum + a.amount, 0);
+  const expenseTotal = accountRecords
+    .filter(a => a.type === 'expense')
+    .reduce((sum, a) => sum + a.amount, 0);
 
   return (
-    <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="font-serif">{dateDisplay}</span>
-              <Badge variant="secondary" className="text-xs">{weekday}</Badge>
-            </DialogTitle>
-          </DialogHeader>
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>{formatDate(date)}</DialogTitle>
+        </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
-              {/* 时间记录区块 */}
-              <section>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-foreground">时间记录</h3>
-                  <button
-                    onClick={() => setActiveModal('time-add')}
-                    className="text-xs text-[var(--ink-blue)] hover:underline"
-                  >
-                    + 新增
-                  </button>
-                </div>
-                
-                {dayData.timeRecords.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-2">暂无时间记录</p>
-                ) : (
-                  <div className="space-y-1">
-                    {dayData.timeRecords.map((record: TimeRecord) => (
-                      <div
-                        key={record.id}
-                        className="flex items-center justify-between p-2 rounded bg-muted/50 hover:bg-muted clickable"
-                        onClick={() => setActiveModal(`time-edit-${record.id}`)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              backgroundColor: TIME_CATEGORIES[record.category]?.color || 'var(--cat-other)',
-                            }}
-                          />
-                          <span className="text-xs font-mono">
-                            {record.startTime}-{record.endTime}
-                          </span>
-                          <span className="text-xs">{record.title}</span>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {TIME_CATEGORIES[record.category]?.name || '其他'}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* 习惯追踪区块 */}
-              <section>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-foreground">今日习惯</h3>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2">
-                  {(['water', 'supplement', 'journal'] as const).map((habitType) => {
-                    const habit = dayData.habits.find((h: HabitDaily) => h.habitType === habitType);
-                    const config = HABIT_CONFIGS[habitType];
-                    const completed = habit?.completed || 0;
-                    const target = config.target;
-                    const percent = Math.min((completed / target) * 100, 100);
-
-                    return (
-                      <button
-                        key={habitType}
-                        onClick={() => setActiveModal(`habit-${habitType}`)}
-                        className="p-3 rounded-lg border border-border hover:border-[var(--habit-complete)] transition-colors clickable"
-                      >
-                        <div className="text-center">
-                          <span className="text-lg mb-1">{config.icon}</span>
-                          <p className="text-xs font-medium">{config.name}</p>
-                          <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[var(--habit-complete)] transition-all"
-                              style={{ width: `${percent}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1 font-mono">
-                            {completed}/{target}{config.unit}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* 专项记录区块 */}
-              <section>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-foreground">专项记录</h3>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setActiveModal('book')}
-                    className="p-3 rounded-lg border border-border hover:border-[var(--reading-amber)] transition-colors clickable text-center"
-                  >
-                    <span className="text-lg mb-1">📚</span>
-                    <p className="text-xs font-medium">阅读</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveModal('fitness')}
-                    className="p-3 rounded-lg border border-border hover:border-[var(--fitness-coral)] transition-colors clickable text-center"
-                  >
-                    <span className="text-lg mb-1">💪</span>
-                    <p className="text-xs font-medium">健身</p>
-                  </button>
-                  <button
-                    onClick={() => setActiveModal('account')}
-                    className="p-3 rounded-lg border border-border hover:border-[var(--expense-orange)] transition-colors clickable text-center"
-                  >
-                    <span className="text-lg mb-1">💰</span>
-                    <p className="text-xs font-medium">记账</p>
-                  </button>
-                </div>
-              </section>
-
-              {/* 记账记录区块 */}
-              {dayData.accountRecords.length > 0 && (
-                <section>
-                  <h3 className="text-sm font-medium text-foreground mb-2">今日收支</h3>
-                  <div className="space-y-1">
-                    {dayData.accountRecords.map((record: AccountRecord) => (
-                      <div
-                        key={record.id}
-                        className="flex items-center justify-between p-2 rounded bg-muted/50"
-                      >
-                        <span className="text-xs">{record.description || '未备注'}</span>
-                        <span
-                          className="text-xs font-mono font-medium"
-                          style={{
-                            color: record.type === 'income'
-                              ? 'var(--income-mint)'
-                              : 'var(--expense-orange)',
-                          }}
-                        >
-                          {record.type === 'income' ? '+' : '-'}¥{record.amount}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+        <ScrollArea className="max-h-[60vh] pr-2">
+          {/* 时间记录概览 */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium">时间记录</h4>
+              <span className="text-xs text-muted-foreground">
+                共 {totalHours}h {remainMinutes}m
+              </span>
             </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
+            
+            {timeRecords.length > 0 ? (
+              <div className="space-y-2">
+                {timeRecords
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                  .map(record => (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-2 p-2 bg-muted/30 rounded-[var(--radius-standard)]"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: getCategoryColor(record.firstCategory) }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {record.title}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatTime(record.startTime)} - {formatTime(record.endTime)}
+                        <span className="ml-2">{record.duration}分钟</span>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {record.secondCategory}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                暂无时间记录
+              </div>
+            )}
 
-      {/* 子弹窗 */}
-      {activeModal === 'time-add' && (
-        <TimeRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={dayData.date}
-        />
-      )}
-      
-      {activeModal?.startsWith('habit-') && (
-        <HabitUpdateModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={dayData.date}
-          habitType={activeModal.split('-')[1] as 'water' | 'supplement' | 'journal'}
-        />
-      )}
-      
-      {activeModal === 'book' && (
-        <BookRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={dayData.date}
-        />
-      )}
-      
-      {activeModal === 'fitness' && (
-        <FitnessRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={dayData.date}
-        />
-      )}
-      
-      {activeModal === 'account' && (
-        <AccountRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={dayData.date}
-        />
-      )}
-    </>
+            {/* 分类统计 */}
+            {Object.keys(categoryStats).length > 0 && (
+              <div className="mt-3 p-2 bg-muted/20 rounded-[var(--radius-standard)]">
+                <div className="text-xs text-muted-foreground mb-1">分类统计</div>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(categoryStats)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([cat, minutes]) => (
+                      <div
+                        key={cat}
+                        className="flex items-center gap-1 text-xs"
+                      >
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: getCategoryColor(cat as FirstCategory) }}
+                        />
+                        <span>{cat}</span>
+                        <span className="text-muted-foreground">{minutes}m</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 习惯完成情况 */}
+          <div className="mb-4">
+            <h4 className="text-sm font-medium mb-2">习惯打卡</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {(['water', 'supplements', 'journal'] as const).map(type => {
+                const config = HABIT_CONFIG[type];
+                const isCompleted = habits ? habits[type].completed : false;
+                
+                return (
+                  <div
+                    key={type}
+                    className={`p-2 rounded-[var(--radius-standard)] text-center ${
+                      isCompleted ? 'bg-primary/10' : 'bg-muted/30'
+                    }`}
+                  >
+                    <div
+                      className="w-6 h-6 mx-auto rounded-full flex items-center justify-center mb-1"
+                      style={{ backgroundColor: isCompleted ? config.color : 'var(--muted)' }}
+                    >
+                      {isCompleted && (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="text-xs">{config.label}</div>
+                    {type === 'water' && habits && (
+                      <div className="text-xs text-muted-foreground">
+                        {habits.water.amount}ml
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 记账记录 */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium">记账记录</h4>
+              <div className="text-xs">
+                <span className="text-account-income">+{incomeTotal.toFixed(2)}</span>
+                <span className="mx-1 text-muted-foreground">/</span>
+                <span className="text-account-expense">-{expenseTotal.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            {accountRecords.length > 0 ? (
+              <div className="space-y-2">
+                {accountRecords.map(record => (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-2 p-2 bg-muted/30 rounded-[var(--radius-standard)]"
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      record.type === 'income' ? 'bg-account-income' : 'bg-account-expense'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm truncate">
+                        {record.firstCategory}
+                        {record.secondCategory && ` - ${record.secondCategory}`}
+                      </div>
+                      {record.note && (
+                        <div className="text-xs text-muted-foreground truncate">
+                          {record.note}
+                        </div>
+                      )}
+                    </div>
+                    <div className={`text-sm font-medium ${
+                      record.type === 'income' ? 'text-account-income' : 'text-account-expense'
+                    }`}>
+                      {record.type === 'income' ? '+' : '-'}{record.amount.toFixed(2)}
+                    </div>
+                    {record.tag && (
+                      <Badge variant="outline" className="text-xs">
+                        {record.tag}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                暂无记账记录
+              </div>
+            )}
+          </div>
+
+          {/* 只读提示 */}
+          <div className="p-3 bg-muted/20 rounded-[var(--radius-standard)] text-center">
+            <p className="text-xs text-muted-foreground">
+              月历为只读视图，编辑请前往「今日待办」页面
+            </p>
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
   );
 }

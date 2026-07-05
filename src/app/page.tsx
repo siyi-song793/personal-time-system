@@ -1,184 +1,190 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useData } from '@/components/providers/data-provider';
-import { ProgressCards } from '@/components/progress/progress-cards';
-import { CalendarGrid } from '@/components/calendar/calendar-grid';
+import { useState, useEffect } from 'react';
 import { MonthSelector } from '@/components/calendar/month-selector';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { CalendarGrid } from '@/components/calendar/calendar-grid';
+import { DayDetailModal } from '@/components/calendar/day-detail-modal';
+import { ProgressCards } from '@/components/progress/progress-cards';
+import { TimeStorage, HabitStorage, AccountStorage, PlanStorage } from '@/lib/storage';
+import type { TimeRecord, HabitRecord, AccountRecord, CalendarDay, FirstCategory } from '@/types';
+import { getCategoryColor } from '@/types';
 
-export default function CalendarPage() {
-  const { 
-    timeRecords, 
-    habits, 
-    accountRecords, 
-    currentDate,
-    initTodayHabits 
-  } = useData();
-  
-  const [selectedMonth, setSelectedMonth] = useState<{
-    year: number;
-    month: number;
-  }>(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
-  });
+export default function HomePage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
+  const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
+  const [accountRecords, setAccountRecords] = useState<AccountRecord[]>([]);
+  const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
+  const [isClient, setIsClient] = useState(false);
 
-  // 初始化今日习惯
   useEffect(() => {
-    initTodayHabits(currentDate);
-  }, [currentDate, initTodayHabits]);
+    setIsClient(true);
+  }, []);
 
-  // 计算月历数据（三层渲染）
-  const calendarData = useMemo(() => {
-    const year = selectedMonth.year;
-    const month = selectedMonth.month;
-    
-    // 获取该月第一天和最后一天
+  useEffect(() => {
+    if (!isClient) return;
+    loadData();
+  }, [currentDate, isClient]);
+
+  const loadData = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-31`;
+
+    setTimeRecords(TimeStorage.getByDateRange(startDate, endDate));
+    setHabitRecords(HabitStorage.getAll());
+    setAccountRecords(AccountStorage.getAll());
+    setProgress(PlanStorage.getProgress());
+  };
+
+  const getDaysInMonth = (date: Date): CalendarDay[] => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    
-    // 获取该月第一天是周几（0=周日）
-    const startWeekday = firstDay.getDay();
-    
-    // 定义日历格子类型
-    type CalendarDay = {
-      type: 'empty';
-      date: null;
-    } | {
-      type: 'day';
-      date: string;
-      day: number;
-      hasTimeRecord: boolean;
-      hasHabitCompleted: boolean;
-      habitPartial: boolean;
-      hasAccountRecord: boolean;
-      hasIncome: boolean;
-      timeRecords: typeof timeRecords;
-      habits: typeof habits;
-      accountRecords: typeof accountRecords;
-    };
-    
-    // 生成日历格子数据
     const days: CalendarDay[] = [];
-    
-    // 前置空白格子
-    for (let i = 0; i < startWeekday; i++) {
-      days.push({ type: 'empty' as const, date: null });
+
+    // 填充月初空白
+    const startDayOfWeek = firstDay.getDay();
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const d = new Date(year, month, -i);
+      days.push(createCalendarDay(d, false));
     }
-    
-    // 实际日期格子
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      
-      // 查找该日期的数据
-      const dayTimeRecords = timeRecords.filter(r => r.date === dateStr);
-      const dayHabits = habits.filter(h => h.date === dateStr);
-      const dayAccounts = accountRecords.filter(a => a.date === dateStr);
-      
-      // 三层渲染标记
-      const hasTimeRecord = dayTimeRecords.length > 0;
-      const habitCompletedCount = dayHabits.filter(h => h.isCompleted).length;
-      const hasHabitCompleted = habitCompletedCount > 0;
-      const habitPartial = habitCompletedCount > 0 && habitCompletedCount < 3;
-      const hasAccountRecord = dayAccounts.length > 0;
-      const hasIncome = dayAccounts.some(a => a.type === 'income');
-      
-      days.push({
-        type: 'day' as const,
-        date: dateStr,
-        day,
-        hasTimeRecord,
-        hasHabitCompleted,
-        habitPartial,
-        hasAccountRecord,
-        hasIncome,
-        timeRecords: dayTimeRecords,
-        habits: dayHabits,
-        accountRecords: dayAccounts,
-      });
+
+    // 填充当月日期
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const d = new Date(year, month, i);
+      days.push(createCalendarDay(d, true));
     }
-    
+
+    // 填充月末空白至42天（6行）
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      days.push(createCalendarDay(d, false));
+    }
+
     return days;
-  }, [selectedMonth, timeRecords, habits, accountRecords]);
-
-  // 切换月份
-  const goToPrevMonth = () => {
-    setSelectedMonth(prev => {
-      if (prev.month === 0) {
-        return { year: prev.year - 1, month: 11 };
-      }
-      return { year: prev.year, month: prev.month - 1 };
-    });
   };
 
-  const goToNextMonth = () => {
-    setSelectedMonth(prev => {
-      if (prev.month === 11) {
-        return { year: prev.year + 1, month: 0 };
-      }
-      return { year: prev.year, month: prev.month + 1 };
-    });
+  const createCalendarDay = (date: Date, isCurrentMonth: boolean): CalendarDay => {
+    const dateStr = date.toISOString().split('T')[0];
+    const dayRecords = timeRecords.filter(r => r.date === dateStr);
+    const dayHabits = habitRecords.find(r => r.date === dateStr) || null;
+    const dayAccounts = accountRecords.filter(r => r.date === dateStr);
+
+    return {
+      date: dateStr,
+      day: date.getDate(),
+      isCurrentMonth,
+      isToday: dateStr === new Date().toISOString().split('T')[0],
+      hasTimeRecord: dayRecords.length > 0,
+      hasHabitCompleted: dayHabits ? (
+        dayHabits.water.completed && 
+        dayHabits.supplements.completed && 
+        dayHabits.journal.completed
+      ) : false,
+      habitPartial: dayHabits ? (
+        [dayHabits.water.completed, dayHabits.supplements.completed, dayHabits.journal.completed]
+          .filter(Boolean).length > 0 &&
+        !(dayHabits.water.completed && dayHabits.supplements.completed && dayHabits.journal.completed)
+      ) : false,
+      hasAccountRecord: dayAccounts.length > 0,
+      hasIncome: dayAccounts.some(a => a.type === 'income'),
+      timeRecords: dayRecords,
+      habits: dayHabits,
+      accountRecords: dayAccounts
+    };
   };
 
-  const goToToday = () => {
-    const now = new Date();
-    setSelectedMonth({ year: now.getFullYear(), month: now.getMonth() });
+  const days = isClient ? getDaysInMonth(currentDate) : [];
+
+  // 月历是只读视图，点击日期打开详情弹窗查看
+  const handleDayClick = (date: string) => {
+    setSelectedDate(date);
   };
 
-  const monthName = `${selectedMonth.year}年${selectedMonth.month + 1}月`;
+  if (!isClient) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">加载中...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background animate-fade-in">
-      <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        {/* 页面标题 */}
-        <header className="mb-6">
-          <h1 className="font-serif text-2xl md:text-3xl text-foreground">
-            {monthName}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            月历概览 · 三层渲染（时序圆点 · 习惯底条 · 记账角点）
-          </p>
-        </header>
+    <div className="px-4 py-6 max-w-md mx-auto">
+      {/* 月份选择器 */}
+      <MonthSelector
+        currentDate={currentDate}
+        onDateChange={setCurrentDate}
+      />
 
-        {/* 四维进度卡片 */}
-        <ProgressCards />
+      {/* 四维进度卡片 */}
+      <ProgressCards progress={progress} />
 
-        {/* 月份选择器 */}
-        <MonthSelector
-          monthName={monthName}
-          onPrev={goToPrevMonth}
-          onNext={goToNextMonth}
-          onToday={goToToday}
-        />
+      {/* 月历网格 - 三层渲染 */}
+      <CalendarGrid
+        days={days}
+        currentMonth={currentDate.getMonth()}
+        currentYear={currentDate.getFullYear()}
+        onDayClick={handleDayClick}
+      />
 
-        {/* 月历网格 */}
-        <CalendarGrid 
-          days={calendarData}
-          selectedMonth={selectedMonth}
-        />
-
-        {/* 说明卡片 */}
-        <Card className="mt-6 p-4">
-          <h3 className="text-sm font-medium text-foreground mb-2">月历标记说明</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[var(--calendar-dot)]" />
-              <span>左上圆点：有时间记录</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-full h-1 rounded bg-[var(--calendar-bar)]" />
-              <span>底部底条：习惯完成</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-tl-none rounded-tr rounded-bl rounded-br bg-[var(--calendar-corner)]" />
-              <span>右上角点：有记账</span>
-            </div>
+      {/* 图例说明 */}
+      <div className="mt-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
+        <div className="text-xs text-muted-foreground mb-2">图例说明</div>
+        <div className="flex flex-wrap gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-primary"></div>
+            <span>时间记录</span>
           </div>
-        </Card>
+          <div className="flex items-center gap-1">
+            <div className="w-4 h-1 rounded bg-habit-water"></div>
+            <span>习惯完成</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-account-income"></div>
+            <span>收入</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-account-expense"></div>
+            <span>支出</span>
+          </div>
+        </div>
       </div>
+
+      {/* 分类色卡 */}
+      <div className="mt-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
+        <div className="text-xs text-muted-foreground mb-2">行为分类</div>
+        <div className="flex flex-wrap gap-2">
+          {(['学习成长', '工作事务', '运动健康', '休息娱乐', '外出出行', '生活日常', '其他'] as FirstCategory[]).map(cat => (
+            <div 
+              key={cat}
+              className="flex items-center gap-1 text-xs"
+            >
+              <div 
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: getCategoryColor(cat) }}
+              ></div>
+              <span className="text-foreground/70">{cat}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 日期详情弹窗 - 只读查看 */}
+      {selectedDate && (
+        <DayDetailModal
+          date={selectedDate}
+          timeRecords={timeRecords.filter(r => r.date === selectedDate)}
+          habits={habitRecords.find(r => r.date === selectedDate) || null}
+          accountRecords={accountRecords.filter(r => r.date === selectedDate)}
+          onClose={() => setSelectedDate(null)}
+        />
+      )}
     </div>
   );
 }

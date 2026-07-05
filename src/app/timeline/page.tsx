@@ -1,294 +1,239 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useData } from '@/components/providers/data-provider';
-import { Card } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { TimeRecordModal } from '@/components/modals/time-record-modal';
-import { TIME_CATEGORIES, type TimeRecord } from '@/types';
-
-// 图标组件
-function PlusIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  );
-}
-
-function ChevronLeftIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6"/>
-    </svg>
-  );
-}
-
-function ChevronRightIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
-  );
-}
+import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { TimeStorage } from '@/lib/storage';
+import type { TimeRecord, FirstCategory } from '@/types';
+import { getCategoryColor, FIRST_CATEGORIES } from '@/types';
 
 export default function TimelinePage() {
-  const { timeRecords, currentDate, setCurrentDate } = useData();
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editRecord, setEditRecord] = useState<TimeRecord | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<FirstCategory | 'all'>('all');
+  const [isClient, setIsClient] = useState(false);
 
-  // 切换日期
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+    loadRecords();
+  }, [currentDate, isClient]);
+
+  const loadRecords = () => {
+    const dateStr = currentDate.toISOString().split('T')[0];
+    const records = TimeStorage.getByDate(dateStr);
+    setTimeRecords(records);
+  };
+
+  const filteredRecords = selectedCategory === 'all'
+    ? timeRecords
+    : timeRecords.filter(r => r.firstCategory === selectedCategory);
+
+  // 按开始时间排序
+  const sortedRecords = [...filteredRecords].sort((a, b) => 
+    a.startTime.localeCompare(b.startTime)
+  );
+
+  const formatDate = (date: Date) => {
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    return `${date.getMonth() + 1}月${date.getDate()}日 周${weekdays[date.getDay()]}`;
+  };
+
+  const formatTime = (isoStr: string) => {
+    const d = new Date(isoStr);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
   const goToPrevDay = () => {
-    const current = new Date(currentDate);
-    current.setDate(current.getDate() - 1);
-    setCurrentDate(current.toISOString().split('T')[0]);
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() - 1);
+    setCurrentDate(newDate);
   };
 
   const goToNextDay = () => {
-    const current = new Date(currentDate);
-    current.setDate(current.getDate() + 1);
-    setCurrentDate(current.toISOString().split('T')[0]);
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 1);
+    setCurrentDate(newDate);
   };
 
   const goToToday = () => {
-    setCurrentDate(new Date().toISOString().split('T')[0]);
+    setCurrentDate(new Date());
   };
 
-  // 获取当日时间记录
-  const dayTimeRecords = useMemo(() => {
-    return timeRecords.filter(r => r.date === currentDate);
-  }, [timeRecords, currentDate]);
+  // 生成24小时时间刻度
+  const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // 生成24小时时间轴数据
-  const timelineData = useMemo(() => {
-    const hours: Array<{
-      hour: number;
-      label: string;
-      records: TimeRecord[];
-    }> = [];
-
-    for (let h = 0; h < 24; h++) {
-      const hourStr = `${String(h).padStart(2, '0')}:00`;
-      const hourEnd = `${String(h).padStart(2, '0')}:59`;
-
-      // 查找该小时的时间记录
-      const hourRecords = dayTimeRecords.filter(record => {
-        const startHour = parseInt(record.startTime.split(':')[0]);
-        const endHour = parseInt(record.endTime.split(':')[0]);
-        return startHour <= h && endHour >= h;
-      });
-
-      hours.push({
-        hour: h,
-        label: hourStr,
-        records: hourRecords,
-      });
-    }
-
-    return hours;
-  }, [dayTimeRecords]);
-
-  // 日期显示
-  const dateDisplay = useMemo(() => {
-    const date = new Date(currentDate);
-    const today = new Date();
-    const isToday = currentDate === today.toISOString().split('T')[0];
+  // 计算记录在时间轴上的位置
+  const getRecordPosition = (record: TimeRecord) => {
+    const start = new Date(record.startTime);
+    const end = new Date(record.endTime);
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    const endMinutes = end.getHours() * 60 + end.getMinutes();
+    const duration = endMinutes - startMinutes;
     
     return {
-      full: `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`,
-      weekday: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
-      isToday,
+      top: `${(startMinutes / 1440) * 100}%`,
+      height: `${(duration / 1440) * 100}%`
     };
-  }, [currentDate]);
+  };
+
+  if (!isClient) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">加载中...</div>
+      </div>
+    );
+  }
+
+  const totalMinutes = sortedRecords.reduce((sum, r) => sum + r.duration, 0);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainMinutes = totalMinutes % 60;
 
   return (
-    <div className="min-h-screen bg-background animate-fade-in">
-      <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        {/* 页面标题 */}
-        <header className="mb-6">
-          <h1 className="font-serif text-2xl md:text-3xl text-foreground">
-            时间轴
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            24h竖向时间轴 · 可视化一天的时间分配
-          </p>
-        </header>
-
-        {/* 日期选择器 */}
-        <Card className="mb-4 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={goToPrevDay}
-                aria-label="前一天"
-              >
-                <ChevronLeftIcon className="w-4 h-4" />
-              </Button>
-              
-              <div className="flex items-center gap-2 px-2">
-                <span className="font-medium text-foreground">
-                  {dateDisplay.full}
-                </span>
-                <Badge variant="secondary" className="text-xs">
-                  {dateDisplay.weekday}
-                </Badge>
-                {dateDisplay.isToday && (
-                  <Badge className="text-xs bg-[var(--ink-blue)] text-white">
-                    今天
-                  </Badge>
-                )}
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={goToNextDay}
-                aria-label="后一天"
-              >
-                <ChevronRightIcon className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToToday}
-              >
-                回到今天
-              </Button>
-              
-              <Button
-                size="sm"
-                onClick={() => setIsAddModalOpen(true)}
-                className="bg-[var(--ink-blue)] text-white"
-              >
-                <PlusIcon className="w-4 h-4 mr-1" />
-                新增
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* 时间轴 */}
-        <Card className="overflow-hidden">
-          <ScrollArea className="h-[calc(100vh-280px)] md:h-[600px]">
-            <div className="p-4 space-y-1">
-              {timelineData.map(({ hour, label, records }) => (
-                <div
-                  key={hour}
-                  className="timeline-hour relative"
-                  data-hour={label}
-                >
-                  {/* 时间记录卡片 */}
-                  {records.map((record) => {
-                    const startHour = parseInt(record.startTime.split(':')[0]);
-                    const startMinute = parseInt(record.startTime.split(':')[1]);
-                    const endHour = parseInt(record.endTime.split(':')[0]);
-                    const endMinute = parseInt(record.endTime.split(':')[1]);
-                    
-                    // 只在开始小时显示完整卡片
-                    if (hour !== startHour) return null;
-
-                    const categoryConfig = TIME_CATEGORIES[record.category];
-
-                    return (
-                      <div
-                        key={record.id}
-                        className="timeline-slot clickable"
-                        style={{
-                          backgroundColor: `${categoryConfig?.color || 'var(--cat-other)'}20`,
-                          borderLeft: `3px solid ${categoryConfig?.color || 'var(--cat-other)'}`,
-                        }}
-                        onClick={() => setEditRecord(record)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-muted-foreground">
-                              {record.startTime}-{record.endTime}
-                            </span>
-                            <span className="text-sm font-medium text-foreground">
-                              {record.title}
-                            </span>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="text-xs"
-                            style={{
-                              borderColor: categoryConfig?.color,
-                              color: categoryConfig?.color,
-                            }}
-                          >
-                            {categoryConfig?.name}
-                          </Badge>
-                        </div>
-                        {record.description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {record.description}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </Card>
-
-        {/* 分类统计 */}
-        <Card className="mt-4 p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">今日时间分配</h3>
-          <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
-            {Object.entries(TIME_CATEGORIES).map(([key, config]) => {
-              const categoryRecords = dayTimeRecords.filter(r => r.category === key);
-              const totalMinutes = categoryRecords.reduce((sum, r) => {
-                const start = parseInt(r.startTime.split(':')[0]) * 60 + parseInt(r.startTime.split(':')[1]);
-                const end = parseInt(r.endTime.split(':')[0]) * 60 + parseInt(r.endTime.split(':')[1]);
-                return sum + (end - start);
-              }, 0);
-
-              return (
-                <div
-                  key={key}
-                  className="text-center p-2 rounded-lg bg-muted/30"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full mx-auto mb-1"
-                    style={{ backgroundColor: config.color }}
-                  />
-                  <p className="text-xs font-medium">{config.name}</p>
-                  <p className="text-xs font-mono text-muted-foreground">
-                    {totalMinutes > 0 ? `${Math.round(totalMinutes / 60)}h` : '0h'}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+    <div className="px-4 py-6 max-w-md mx-auto">
+      {/* 日期选择器 */}
+      <div className="flex items-center justify-between mb-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={goToPrevDay}
+          className="h-8 w-8"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-serif font-bold">
+            {formatDate(currentDate)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="text-xs h-6"
+          >
+            今天
+          </Button>
+        </div>
+        
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={goToNextDay}
+          className="h-8 w-8"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
-      {/* 新增时间记录弹窗 */}
-      <TimeRecordModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        date={currentDate}
-      />
+      {/* 统计信息 */}
+      <div className="mb-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">今日时间记录</span>
+          <span className="text-sm font-medium">
+            {sortedRecords.length} 条 · {totalHours}h {remainMinutes}m
+          </span>
+        </div>
+      </div>
 
-      {/* 编辑时间记录弹窗 */}
-      {editRecord && (
-        <TimeRecordModal
-          isOpen={true}
-          onClose={() => setEditRecord(null)}
-          date={currentDate}
-          editRecord={editRecord}
-        />
-      )}
+      {/* 分类筛选 */}
+      <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-2">
+        <Button
+          variant={selectedCategory === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedCategory('all')}
+          className="text-xs h-7 flex-shrink-0"
+        >
+          全部
+        </Button>
+        {FIRST_CATEGORIES.map(cat => (
+          <Button
+            key={cat}
+            variant={selectedCategory === cat ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSelectedCategory(cat)}
+            className="text-xs h-7 flex-shrink-0"
+            style={selectedCategory === cat ? { backgroundColor: getCategoryColor(cat) } : {}}
+          >
+            {cat}
+          </Button>
+        ))}
+      </div>
+
+      {/* 24h时间轴 */}
+      <div className="relative bg-card rounded-[var(--radius-standard)] shadow-[var(--shadow-global)] overflow-hidden">
+        {/* 时间刻度 */}
+        <div className="absolute left-0 top-0 bottom-0 w-12 bg-muted/20 border-r">
+          {hours.map(hour => (
+            <div
+              key={hour}
+              className="absolute left-0 right-0 text-xs text-muted-foreground text-center"
+              style={{ top: `${(hour / 24) * 100}%` }}
+            >
+              {String(hour).padStart(2, '0')}:00
+            </div>
+          ))}
+        </div>
+
+        {/* 时间轴内容 */}
+        <div className="ml-12 relative" style={{ height: '600px' }}>
+          {/* 小时线 */}
+          {hours.map(hour => (
+            <div
+              key={hour}
+              className="absolute left-0 right-0 border-t border-dashed border-border/50"
+              style={{ top: `${(hour / 24) * 100}%` }}
+            />
+          ))}
+
+          {/* 时间记录块 */}
+          {sortedRecords.map(record => {
+            const pos = getRecordPosition(record);
+            return (
+              <div
+                key={record.id}
+                className="absolute left-2 right-2 rounded-[var(--radius-standard)] p-2 text-white text-xs overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                style={{
+                  top: pos.top,
+                  height: pos.height,
+                  minHeight: '24px',
+                  backgroundColor: getCategoryColor(record.firstCategory)
+                }}
+              >
+                <div className="font-medium truncate">{record.title}</div>
+                <div className="opacity-80">
+                  {formatTime(record.startTime)} - {formatTime(record.endTime)}
+                </div>
+                {record.duration >= 30 && (
+                  <div className="opacity-80">{record.duration}分钟</div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* 当前时间指示线 */}
+          {currentDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0] && (
+            <div
+              className="absolute left-0 right-0 h-0.5 bg-destructive z-10"
+              style={{
+                top: `${((new Date().getHours() * 60 + new Date().getMinutes()) / 1440) * 100}%`
+              }}
+            >
+              <div className="absolute left-0 w-2 h-2 rounded-full bg-destructive -translate-y-[3px]" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 只读提示 */}
+      <div className="mt-4 p-3 bg-muted/20 rounded-[var(--radius-standard)] text-center">
+        <p className="text-xs text-muted-foreground">
+          时间轴为只读视图，添加记录请前往「今日待办」页面
+        </p>
+      </div>
     </div>
   );
 }

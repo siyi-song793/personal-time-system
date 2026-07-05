@@ -1,151 +1,214 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { useData } from '@/components/providers/data-provider';
-import { TIME_CATEGORIES, type TimeCategory } from '@/types';
+import { TimeStorage } from '@/lib/storage';
+import type { FirstCategory } from '@/types';
+import { FIRST_CATEGORIES, getSecondCategories, getThirdCategories, getCategoryColor } from '@/types';
 
 interface TimeRecordModalProps {
-  isOpen: boolean;
   onClose: () => void;
-  date: string;
-  editRecord?: {
+  onSaved: () => void;
+  editData?: {
     id: string;
+    title: string;
+    firstCategory: FirstCategory;
+    secondCategory: string;
+    thirdCategory?: string;
     startTime: string;
     endTime: string;
-    category: TimeCategory;
-    title: string;
-    description?: string;
+    note?: string;
   };
 }
 
-export function TimeRecordModal({ isOpen, onClose, date, editRecord }: TimeRecordModalProps) {
-  const { addTimeRecord, updateTimeRecord } = useData();
-  
-  const [startTime, setStartTime] = useState(editRecord?.startTime || '09:00');
-  const [endTime, setEndTime] = useState(editRecord?.endTime || '10:00');
-  const [category, setCategory] = useState<TimeCategory>(editRecord?.category || 'work');
-  const [title, setTitle] = useState(editRecord?.title || '');
-  const [description, setDescription] = useState(editRecord?.description || '');
+export function TimeRecordModal({ onClose, onSaved, editData }: TimeRecordModalProps) {
+  const [title, setTitle] = useState(editData?.title || '');
+  const [firstCategory, setFirstCategory] = useState<FirstCategory>(editData?.firstCategory || '工作事务');
+  const [secondCategory, setSecondCategory] = useState(editData?.secondCategory || '');
+  const [thirdCategory, setThirdCategory] = useState(editData?.thirdCategory || '');
+  const [startTime, setStartTime] = useState(editData?.startTime ? new Date(editData.startTime).toTimeString().slice(0, 5) : '');
+  const [endTime, setEndTime] = useState(editData?.endTime ? new Date(editData.endTime).toTimeString().slice(0, 5) : '');
+  const [note, setNote] = useState(editData?.note || '');
 
-  const handleSubmit = () => {
-    if (!title.trim()) return;
+  const secondCategories = getSecondCategories(firstCategory);
+  const thirdCategories = getThirdCategories(firstCategory, secondCategory);
 
-    if (editRecord) {
-      updateTimeRecord(editRecord.id, {
-        startTime,
-        endTime,
-        category,
+  const handleFirstCategoryChange = (cat: FirstCategory) => {
+    setFirstCategory(cat);
+    setSecondCategory('');
+    setThirdCategory('');
+  };
+
+  const handleSave = () => {
+    if (!title.trim() || !startTime || !endTime) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const startDateTime = `${today}T${startTime}:00`;
+    const endDateTime = `${today}T${endTime}:00`;
+    
+    const start = new Date(startDateTime);
+    const end = new Date(endDateTime);
+    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+
+    if (editData) {
+      TimeStorage.update(editData.id, {
         title,
-        description: description || undefined,
+        firstCategory,
+        secondCategory: secondCategory || secondCategories[0] || '',
+        thirdCategory: thirdCategory || undefined,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        duration,
+        note: note || undefined
       });
     } else {
-      addTimeRecord({
-        date,
-        startTime,
-        endTime,
-        category,
+      TimeStorage.add({
         title,
-        description: description || undefined,
+        firstCategory,
+        secondCategory: secondCategory || secondCategories[0] || '',
+        thirdCategory: thirdCategory || undefined,
+        startTime: startDateTime,
+        endTime: endDateTime,
+        duration,
+        date: today,
+        isPlanned: false,
+        isCompleted: true,
+        note: note || undefined
       });
     }
 
-    onClose();
+    onSaved();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md modal-content">
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {editRecord ? '编辑时间记录' : '新增时间记录'}
-          </DialogTitle>
+          <DialogTitle>{editData ? '编辑时间记录' : '新增时间记录'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4">
+          {/* 标题 */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">标题</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="请输入活动标题"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
+            />
+          </div>
+
+          {/* 一级分类 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">一级分类</label>
+            <div className="flex flex-wrap gap-2">
+              {FIRST_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleFirstCategoryChange(cat)}
+                  className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                    firstCategory === cat
+                      ? 'text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                  style={firstCategory === cat ? { backgroundColor: getCategoryColor(cat) } : {}}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 二级分类 */}
+          {secondCategories.length > 0 && (
             <div>
-              <Label htmlFor="startTime">开始时间</Label>
-              <Input
-                id="startTime"
+              <label className="text-sm font-medium mb-2 block">二级分类</label>
+              <div className="flex flex-wrap gap-2">
+                {secondCategories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSecondCategory(cat)}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                      secondCategory === cat
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 三级分类 */}
+          {thirdCategories.length > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">三级分类</label>
+              <div className="flex flex-wrap gap-2">
+                {thirdCategories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setThirdCategory(cat)}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                      thirdCategory === cat
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 时间选择 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">开始时间</label>
+              <input
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="font-mono"
+                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
               />
             </div>
             <div>
-              <Label htmlFor="endTime">结束时间</Label>
-              <Input
-                id="endTime"
+              <label className="text-sm font-medium mb-1 block">结束时间</label>
+              <input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="font-mono"
+                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
               />
             </div>
           </div>
 
+          {/* 备注 */}
           <div>
-            <Label htmlFor="category">时间分类</Label>
-            <Select
-              value={category}
-              onValueChange={(value) => setCategory(value as TimeCategory)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择分类" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(TIME_CATEGORIES).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: config.color }}
-                      />
-                      <span>{config.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="title">事项标题</Label>
-            <Input
-              id="title"
-              placeholder="例如：完成项目报告"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+            <label className="text-sm font-medium mb-1 block">备注</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="可选备注"
+              className="w-full h-20 px-3 py-2 border rounded-[var(--radius-standard)] resize-none"
             />
           </div>
 
-          <div>
-            <Label htmlFor="description">备注（可选）</Label>
-            <Textarea
-              id="description"
-              placeholder="补充说明..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
+          {/* 操作按钮 */}
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} className="flex-1">
+              保存
+            </Button>
+            <Button variant="outline" onClick={onClose}>
+              取消
+            </Button>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} disabled={!title.trim()}>
-            {editRecord ? '保存' : '添加'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

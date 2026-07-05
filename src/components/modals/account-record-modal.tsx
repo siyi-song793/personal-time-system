@@ -1,144 +1,220 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useData } from '@/components/providers/data-provider';
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, type AccountType, type AccountRecord } from '@/types';
+import { AccountStorage } from '@/lib/storage';
+import type { AccountType, ExpenseFirstCategory, IncomeCategory, AccountTag } from '@/types';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, autoDetectTag } from '@/types';
 
 interface AccountRecordModalProps {
-  isOpen: boolean;
   onClose: () => void;
-  date: string;
-  editRecord?: AccountRecord;
+  onSaved: () => void;
+  editData?: {
+    id: string;
+    type: AccountType;
+    firstCategory: string;
+    secondCategory?: string;
+    amount: number;
+    note?: string;
+  };
 }
 
-export function AccountRecordModal({ isOpen, onClose, date, editRecord }: AccountRecordModalProps) {
-  const { addAccountRecord, updateAccountRecord } = useData();
-  
-  const [type, setType] = useState<AccountType>(editRecord?.type || 'expense');
-  const [category, setCategory] = useState<string>(editRecord?.category || 'food');
-  const [amount, setAmount] = useState(editRecord?.amount || 0);
-  const [description, setDescription] = useState(editRecord?.description || '');
+export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecordModalProps) {
+  const [type, setType] = useState<AccountType>(editData?.type || 'expense');
+  const [firstCategory, setFirstCategory] = useState<string>(editData?.firstCategory || '饮食餐饮');
+  const [secondCategory, setSecondCategory] = useState(editData?.secondCategory || '');
+  const [amount, setAmount] = useState(editData?.amount?.toString() || '');
+  const [note, setNote] = useState(editData?.note || '');
 
-  const handleSubmit = () => {
-    if (amount <= 0) return;
+  const expenseCategories = Object.keys(EXPENSE_CATEGORIES) as ExpenseFirstCategory[];
+  const incomeCategories = INCOME_CATEGORIES;
 
-    if (editRecord) {
-      updateAccountRecord(editRecord.id, {
+  const currentSecondCategories = type === 'expense' 
+    ? EXPENSE_CATEGORIES[firstCategory as ExpenseFirstCategory] || []
+    : [];
+
+  const handleTypeChange = (newType: AccountType) => {
+    setType(newType);
+    if (newType === 'expense') {
+      setFirstCategory('饮食餐饮');
+    } else {
+      setFirstCategory('工资收入');
+    }
+    setSecondCategory('');
+  };
+
+  const handleFirstCategoryChange = (cat: string) => {
+    setFirstCategory(cat);
+    setSecondCategory('');
+  };
+
+  const handleSave = () => {
+    if (!amount || parseFloat(amount) <= 0) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const tag = autoDetectTag(firstCategory, note);
+
+    if (editData) {
+      AccountStorage.update(editData.id, {
         type,
-        category: category as any,
-        amount,
-        description: description || undefined,
+        firstCategory: firstCategory as ExpenseFirstCategory | IncomeCategory,
+        secondCategory: secondCategory || undefined,
+        amount: parseFloat(amount),
+        note: note || undefined,
+        tag
       });
     } else {
-      addAccountRecord({
-        date,
+      AccountStorage.add({
+        date: today,
         type,
-        category: category as any,
-        amount,
-        description: description || undefined,
+        firstCategory: firstCategory as ExpenseFirstCategory | IncomeCategory,
+        secondCategory: secondCategory || undefined,
+        amount: parseFloat(amount),
+        note: note || undefined,
+        tag
       });
     }
 
-    onClose();
+    onSaved();
   };
 
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const tagColors: Record<AccountTag, string> = {
+    '刚需消费': 'var(--tag-necessary)',
+    '品质消费': 'var(--tag-quality)',
+    '冲动消费': 'var(--tag-impulse)'
+  };
+
+  const currentTag = autoDetectTag(firstCategory, note);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md modal-content">
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>💰</span>
-            <span>{editRecord ? '编辑记账' : '新增记账'}</span>
-          </DialogTitle>
+          <DialogTitle>{editData ? '编辑记账' : '新增记账'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <Tabs
-            value={type}
-            onValueChange={(value) => {
-              setType(value as AccountType);
-              // 切换类型时重置分类
-              setCategory(value === 'income' ? 'salary' : 'food');
-            }}
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="expense" className="data-[state=active]:text-[var(--expense-orange)]">
-                支出
-              </TabsTrigger>
-              <TabsTrigger value="income" className="data-[state=active]:text-[var(--income-mint)]">
-                收入
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div>
-            <Label htmlFor="category">{type === 'income' ? '收入分类' : '支出分类'}</Label>
-            <Select
-              value={category}
-              onValueChange={setCategory}
+        <div className="space-y-4">
+          {/* 收入/支出切换 */}
+          <div className="flex gap-2 p-1 bg-muted rounded-[var(--radius-capsule)]">
+            <button
+              onClick={() => handleTypeChange('expense')}
+              className={`flex-1 py-2 text-sm rounded-[var(--radius-capsule)] transition-all ${
+                type === 'expense'
+                  ? 'bg-account-expense text-white'
+                  : 'text-muted-foreground'
+              }`}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="选择分类" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(categories).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <span>{config.name}</span>
-                  </SelectItem>
+              支出
+            </button>
+            <button
+              onClick={() => handleTypeChange('income')}
+              className={`flex-1 py-2 text-sm rounded-[var(--radius-capsule)] transition-all ${
+                type === 'income'
+                  ? 'bg-account-income text-white'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              收入
+            </button>
+          </div>
+
+          {/* 金额 */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">金额 *</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg">¥</span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-12 pl-8 pr-3 text-xl font-medium border rounded-[var(--radius-standard)]"
+                inputMode="decimal"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* 一级分类 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">分类</label>
+            <div className="flex flex-wrap gap-2">
+              {(type === 'expense' ? expenseCategories : incomeCategories).map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleFirstCategoryChange(cat)}
+                  className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                    firstCategory === cat
+                      ? type === 'expense'
+                        ? 'bg-account-expense text-white'
+                        : 'bg-account-income text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 二级分类（仅支出） */}
+          {type === 'expense' && currentSecondCategories.length > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-2 block">细分</label>
+              <div className="flex flex-wrap gap-2">
+                {currentSecondCategories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSecondCategory(cat)}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                      secondCategory === cat
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+              </div>
+            </div>
+          )}
 
+          {/* 标签预览 */}
+          {type === 'expense' && (
+            <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-[var(--radius-standard)]">
+              <span className="text-xs text-muted-foreground">自动标签：</span>
+              <span
+                className="px-2 py-0.5 text-xs rounded-full text-white"
+                style={{ backgroundColor: tagColors[currentTag] }}
+              >
+                {currentTag}
+              </span>
+            </div>
+          )}
+
+          {/* 备注 */}
           <div>
-            <Label htmlFor="amount">金额（元）</Label>
-            <Input
-              id="amount"
-              type="number"
-              min={0}
-              step={0.01}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              className="font-mono"
-              placeholder="0.00"
+            <label className="text-sm font-medium mb-1 block">备注</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="可选备注"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
             />
           </div>
 
-          <div>
-            <Label htmlFor="description">备注（可选）</Label>
-            <Textarea
-              id="description"
-              placeholder="消费说明..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
+          {/* 操作按钮 */}
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} className="flex-1">
+              保存
+            </Button>
+            <Button variant="outline" onClick={onClose}>
+              取消
+            </Button>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={amount <= 0}
-            style={{
-              backgroundColor: type === 'income' ? 'var(--income-mint)' : 'var(--expense-orange)',
-            }}
-          >
-            {editRecord ? '保存' : '添加'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

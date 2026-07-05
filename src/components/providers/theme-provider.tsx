@@ -19,11 +19,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const savedTheme = ThemeStorage.get();
-    setThemeState(savedTheme);
+    // 如果存储的是'system'，根据系统偏好设置主题
+    if (savedTheme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      setThemeState(systemTheme);
+    } else {
+      setThemeState(savedTheme);
+    }
     setMounted(true);
     
     // 应用主题到document
-    if (savedTheme === 'dark') {
+    if (savedTheme === 'dark' || (savedTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');

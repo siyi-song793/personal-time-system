@@ -1,470 +1,818 @@
-// localStorage服务 - 离线优先架构
-
 import type {
   TimeRecord,
-  HabitDaily,
+  HabitRecord,
   BookRecord,
   FitnessRecord,
   AccountRecord,
   TodoItem,
+  Plan,
+  UndoAction,
+  AppData,
   HabitType,
+  FirstCategory,
+  AccountType,
+  ExpenseFirstCategory,
+  IncomeCategory
 } from '@/types';
+
+import { autoDetectTag } from '@/types';
+
+// ============================================
+// 存储键名
+// ============================================
 
 const STORAGE_KEYS = {
   TIME_RECORDS: 'time_records',
-  HABIT_DAILY: 'habit_daily',
-  BOOK_RECORDS: 'book_records',
-  FITNESS_RECORDS: 'fitness_records',
-  ACCOUNT_RECORDS: 'account_records',
-  TODO_ITEMS: 'todo_items',
-  THEME: 'theme',
+  HABIT_RECORDS: 'habit_records',
+  BOOK_RECORDS: 'user_book_records',
+  FITNESS_RECORDS: 'user_fitness_records',
+  ACCOUNT_RECORDS: 'user_account_records',
+  TODOS: 'todos',
+  PLANS: 'plans',
+  UNDO_ACTIONS: 'undo_actions',
+  THEME: 'theme'
 };
 
-// ==================== 通用存储函数 ====================
-function getItem<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
-}
+// ============================================
+// 通用工具函数
+// ============================================
 
-function setItem<T>(key: string, data: T[]): void {
+const generateId = (): string => {
+  return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+const getFromStorage = <T>(key: string, defaultValue: T): T => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveToStorage = <T>(key: string, data: T): void => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(data));
-}
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save to localStorage:', e);
+  }
+};
 
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
+// ============================================
+// A轨：时间记录服务
+// ============================================
 
-function getDateString(date: Date = new Date()): string {
-  return date.toISOString().split('T')[0];
-}
-
-// ==================== A轨：time_record ====================
-export const TimeRecordStorage = {
-  getAll(): TimeRecord[] {
-    return getItem<TimeRecord>(STORAGE_KEYS.TIME_RECORDS);
+export const TimeStorage = {
+  getAll: (): TimeRecord[] => {
+    return getFromStorage<TimeRecord[]>(STORAGE_KEYS.TIME_RECORDS, []);
   },
 
-  getByDate(date: string): TimeRecord[] {
-    return this.getAll().filter(r => r.date === date);
+  getByDate: (date: string): TimeRecord[] => {
+    const records = TimeStorage.getAll();
+    return records.filter(r => r.date === date);
   },
 
-  getByMonth(year: number, month: number): TimeRecord[] {
-    return this.getAll().filter(r => {
-      const d = new Date(r.date);
-      return d.getFullYear() === year && d.getMonth() === month;
-    });
+  getByDateRange: (startDate: string, endDate: string): TimeRecord[] => {
+    const records = TimeStorage.getAll();
+    return records.filter(r => r.date >= startDate && r.date <= endDate);
   },
 
-  add(record: Omit<TimeRecord, 'id' | 'createdAt' | 'updatedAt'>): TimeRecord {
+  getByCategory: (category: FirstCategory): TimeRecord[] => {
+    const records = TimeStorage.getAll();
+    return records.filter(r => r.firstCategory === category);
+  },
+
+  add: (record: Omit<TimeRecord, 'id' | 'createdAt' | 'updatedAt'>): TimeRecord => {
+    const records = TimeStorage.getAll();
     const now = new Date().toISOString();
     const newRecord: TimeRecord = {
       ...record,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const records = this.getAll();
     records.push(newRecord);
-    setItem(STORAGE_KEYS.TIME_RECORDS, records);
+    saveToStorage(STORAGE_KEYS.TIME_RECORDS, records);
+    UndoStorage.addAction('create', 'time', newRecord.id, undefined, newRecord);
     return newRecord;
   },
 
-  update(id: string, updates: Partial<TimeRecord>): TimeRecord | null {
-    const records = this.getAll();
+  update: (id: string, updates: Partial<TimeRecord>): TimeRecord | null => {
+    const records = TimeStorage.getAll();
     const index = records.findIndex(r => r.id === id);
     if (index === -1) return null;
-    records[index] = {
-      ...records[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.TIME_RECORDS, records);
+    
+    const beforeData = { ...records[index] };
+    records[index] = { ...records[index], ...updates, updatedAt: new Date().toISOString() };
+    saveToStorage(STORAGE_KEYS.TIME_RECORDS, records);
+    UndoStorage.addAction('update', 'time', id, beforeData, records[index]);
     return records[index];
   },
 
-  delete(id: string): boolean {
-    const records = this.getAll();
-    const filtered = records.filter(r => r.id !== id);
-    if (filtered.length === records.length) return false;
-    setItem(STORAGE_KEYS.TIME_RECORDS, filtered);
+  delete: (id: string): boolean => {
+    const records = TimeStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    
+    const deleted = records[index];
+    records.splice(index, 1);
+    saveToStorage(STORAGE_KEYS.TIME_RECORDS, records);
+    UndoStorage.addAction('delete', 'time', id, deleted, undefined);
+    
+    // 删除关联：待办状态回退
+    if (deleted.todoId) {
+      TodoStorage.unlinkTimeRecord(deleted.todoId);
+    }
+    // 删除关联：账单关联清空
+    if (deleted.accountIds?.length) {
+      deleted.accountIds.forEach(accountId => {
+        AccountStorage.unlinkTimeRecord(accountId);
+      });
+    }
     return true;
   },
+
+  // 获取某天的总时长（分钟）
+  getDailyTotal: (date: string): number => {
+    const records = TimeStorage.getByDate(date);
+    return records.reduce((sum, r) => sum + r.duration, 0);
+  },
+
+  // 获取某天的分类时长
+  getDailyCategoryMinutes: (date: string): Record<FirstCategory, number> => {
+    const records = TimeStorage.getByDate(date);
+    const result = {} as Record<FirstCategory, number>;
+    
+    // 初始化所有分类为0
+    (['学习成长', '工作事务', '运动健康', '休息娱乐', '外出出行', '生活日常', '其他'] as FirstCategory[]).forEach(cat => {
+      result[cat] = 0;
+    });
+    
+    records.forEach(r => {
+      result[r.firstCategory] = (result[r.firstCategory] || 0) + r.duration;
+    });
+    
+    return result;
+  },
+
+  // 取消账单关联
+  unlinkAccount: (timeRecordId: string, accountId: string): void => {
+    const records = TimeStorage.getAll();
+    const index = records.findIndex(r => r.id === timeRecordId);
+    if (index !== -1) {
+      records[index].accountIds = records[index].accountIds?.filter(id => id !== accountId) || [];
+      saveToStorage(STORAGE_KEYS.TIME_RECORDS, records);
+    }
+  }
 };
 
-// ==================== B轨：habit_daily ====================
+// ============================================
+// B轨：习惯记录服务
+// ============================================
+
 export const HabitStorage = {
-  getAll(): HabitDaily[] {
-    return getItem<HabitDaily>(STORAGE_KEYS.HABIT_DAILY);
+  getAll: (): HabitRecord[] => {
+    return getFromStorage<HabitRecord[]>(STORAGE_KEYS.HABIT_RECORDS, []);
   },
 
-  getByDate(date: string): HabitDaily[] {
-    return this.getAll().filter(h => h.date === date);
+  getByDate: (date: string): HabitRecord | null => {
+    const records = HabitStorage.getAll();
+    return records.find(r => r.date === date) || null;
   },
 
-  getByDateAndType(date: string, habitType: HabitType): HabitDaily | undefined {
-    return this.getByDate(date).find(h => h.habitType === habitType);
-  },
-
-  getByMonth(year: number, month: number): HabitDaily[] {
-    return this.getAll().filter(h => {
-      const d = new Date(h.date);
-      return d.getFullYear() === year && d.getMonth() === month;
-    });
-  },
-
-  // 初始化今日习惯（如果不存在）
-  initTodayHabits(date: string = getDateString()): HabitDaily[] {
-    const existing = this.getByDate(date);
-    const habitTypes: HabitType[] = ['water', 'supplement', 'journal'];
+  // 获取或创建今日习惯记录
+  getOrCreateToday: (): HabitRecord => {
+    const today = new Date().toISOString().split('T')[0];
+    let record = HabitStorage.getByDate(today);
     
-    for (const type of habitTypes) {
-      if (!existing.find(h => h.habitType === type)) {
-        this.add({
-          date,
-          habitType: type,
-          target: type === 'water' ? 2000 : 1,
-          completed: 0,
-          isCompleted: false,
-        });
-      }
+    if (!record) {
+      record = HabitStorage.add({
+        date: today,
+        water: { completed: false, amount: 0 },
+        supplements: { completed: false },
+        journal: { completed: false }
+      });
     }
     
-    return this.getByDate(date);
+    return record;
   },
 
-  add(habit: Omit<HabitDaily, 'id' | 'createdAt' | 'updatedAt'>): HabitDaily {
+  add: (data: Omit<HabitRecord, 'id' | 'createdAt' | 'updatedAt'>): HabitRecord => {
+    const records = HabitStorage.getAll();
     const now = new Date().toISOString();
-    const newHabit: HabitDaily = {
-      ...habit,
+    const newRecord: HabitRecord = {
+      ...data,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const habits = this.getAll();
-    habits.push(newHabit);
-    setItem(STORAGE_KEYS.HABIT_DAILY, habits);
-    return newHabit;
+    records.push(newRecord);
+    saveToStorage(STORAGE_KEYS.HABIT_RECORDS, records);
+    return newRecord;
   },
 
-  updateProgress(date: string, habitType: HabitType, completed: number): HabitDaily | null {
-    const habits = this.getAll();
-    const index = habits.findIndex(h => h.date === date && h.habitType === habitType);
-    if (index === -1) {
-      // 如果不存在，先创建
-      const newHabit = this.add({
+  update: (id: string, updates: Partial<HabitRecord>): HabitRecord | null => {
+    const records = HabitStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index === -1) return null;
+    
+    records[index] = { ...records[index], ...updates, updatedAt: new Date().toISOString() };
+    saveToStorage(STORAGE_KEYS.HABIT_RECORDS, records);
+    return records[index];
+  },
+
+  // 更新饮水量
+  updateWater: (date: string, amount: number): HabitRecord | null => {
+    const record = HabitStorage.getByDate(date);
+    if (!record) {
+      return HabitStorage.add({
         date,
-        habitType,
-        target: habitType === 'water' ? 2000 : 1,
-        completed,
-        isCompleted: completed >= (habitType === 'water' ? 2000 : 1),
+        water: { completed: amount >= 2000, amount },
+        supplements: { completed: false },
+        journal: { completed: false }
       });
-      return newHabit;
     }
     
-    const target = habits[index].target;
-    habits[index] = {
-      ...habits[index],
-      completed,
-      isCompleted: completed >= target,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.HABIT_DAILY, habits);
-    return habits[index];
-  },
-
-  delete(id: string): boolean {
-    const habits = this.getAll();
-    const filtered = habits.filter(h => h.id !== id);
-    if (filtered.length === habits.length) return false;
-    setItem(STORAGE_KEYS.HABIT_DAILY, filtered);
-    return true;
-  },
-};
-
-// ==================== C轨：专项附属表 ====================
-
-// C1: 阅读记录
-export const BookStorage = {
-  getAll(): BookRecord[] {
-    return getItem<BookRecord>(STORAGE_KEYS.BOOK_RECORDS);
-  },
-
-  getByDate(date: string): BookRecord[] {
-    return this.getAll().filter(b => b.date === date);
-  },
-
-  getByMonth(year: number, month: number): BookRecord[] {
-    return this.getAll().filter(b => {
-      const d = new Date(b.date);
-      return d.getFullYear() === year && d.getMonth() === month;
+    return HabitStorage.update(record.id, {
+      water: { completed: amount >= 2000, amount }
     });
   },
 
-  add(record: Omit<BookRecord, 'id' | 'createdAt' | 'updatedAt'>): BookRecord {
+  // 切换保健品打卡
+  toggleSupplements: (date: string): HabitRecord | null => {
+    const record = HabitStorage.getByDate(date);
+    if (!record) {
+      return HabitStorage.add({
+        date,
+        water: { completed: false, amount: 0 },
+        supplements: { completed: true },
+        journal: { completed: false }
+      });
+    }
+    
+    return HabitStorage.update(record.id, {
+      supplements: { completed: !record.supplements.completed }
+    });
+  },
+
+  // 切换手帐打卡
+  toggleJournal: (date: string): HabitRecord | null => {
+    const record = HabitStorage.getByDate(date);
+    if (!record) {
+      return HabitStorage.add({
+        date,
+        water: { completed: false, amount: 0 },
+        supplements: { completed: false },
+        journal: { completed: true }
+      });
+    }
+    
+    return HabitStorage.update(record.id, {
+      journal: { completed: !record.journal.completed }
+    });
+  },
+
+  // 检查某天习惯是否全部完成
+  isAllCompleted: (date: string): boolean => {
+    const record = HabitStorage.getByDate(date);
+    if (!record) return false;
+    return record.water.completed && record.supplements.completed && record.journal.completed;
+  },
+
+  // 检查某天习惯是否部分完成
+  isPartialCompleted: (date: string): boolean => {
+    const record = HabitStorage.getByDate(date);
+    if (!record) return false;
+    const completedCount = [
+      record.water.completed,
+      record.supplements.completed,
+      record.journal.completed
+    ].filter(Boolean).length;
+    return completedCount > 0 && completedCount < 3;
+  }
+};
+
+// ============================================
+// C轨：阅读记录服务
+// ============================================
+
+export const BookStorage = {
+  getAll: (): BookRecord[] => {
+    return getFromStorage<BookRecord[]>(STORAGE_KEYS.BOOK_RECORDS, []);
+  },
+
+  getByDate: (date: string): BookRecord[] => {
+    const records = BookStorage.getAll();
+    return records.filter(r => r.date === date);
+  },
+
+  add: (record: Omit<BookRecord, 'id' | 'createdAt' | 'updatedAt'>): BookRecord => {
+    const records = BookStorage.getAll();
     const now = new Date().toISOString();
     const newRecord: BookRecord = {
       ...record,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const records = this.getAll();
     records.push(newRecord);
-    setItem(STORAGE_KEYS.BOOK_RECORDS, records);
+    saveToStorage(STORAGE_KEYS.BOOK_RECORDS, records);
+    UndoStorage.addAction('create', 'book', newRecord.id, undefined, newRecord);
     return newRecord;
   },
 
-  update(id: string, updates: Partial<BookRecord>): BookRecord | null {
-    const records = this.getAll();
-    const index = records.findIndex(b => b.id === id);
+  update: (id: string, updates: Partial<BookRecord>): BookRecord | null => {
+    const records = BookStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
     if (index === -1) return null;
-    records[index] = {
-      ...records[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.BOOK_RECORDS, records);
+    
+    const beforeData = { ...records[index] };
+    records[index] = { ...records[index], ...updates, updatedAt: new Date().toISOString() };
+    saveToStorage(STORAGE_KEYS.BOOK_RECORDS, records);
+    UndoStorage.addAction('update', 'book', id, beforeData, records[index]);
     return records[index];
   },
 
-  delete(id: string): boolean {
-    const records = this.getAll();
-    const filtered = records.filter(b => b.id !== id);
-    if (filtered.length === records.length) return false;
-    setItem(STORAGE_KEYS.BOOK_RECORDS, filtered);
+  delete: (id: string): boolean => {
+    const records = BookStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    
+    const deleted = records[index];
+    records.splice(index, 1);
+    saveToStorage(STORAGE_KEYS.BOOK_RECORDS, records);
+    UndoStorage.addAction('delete', 'book', id, deleted, undefined);
     return true;
-  },
+  }
 };
 
-// C2: 健身记录
+// ============================================
+// C轨：健身记录服务
+// ============================================
+
 export const FitnessStorage = {
-  getAll(): FitnessRecord[] {
-    return getItem<FitnessRecord>(STORAGE_KEYS.FITNESS_RECORDS);
+  getAll: (): FitnessRecord[] => {
+    return getFromStorage<FitnessRecord[]>(STORAGE_KEYS.FITNESS_RECORDS, []);
   },
 
-  getByDate(date: string): FitnessRecord[] {
-    return this.getAll().filter(f => f.date === date);
+  getByDate: (date: string): FitnessRecord[] => {
+    const records = FitnessStorage.getAll();
+    return records.filter(r => r.date === date);
   },
 
-  getByMonth(year: number, month: number): FitnessRecord[] {
-    return this.getAll().filter(f => {
-      const d = new Date(f.date);
-      return d.getFullYear() === year && d.getMonth() === month;
-    });
-  },
-
-  add(record: Omit<FitnessRecord, 'id' | 'createdAt' | 'updatedAt'>): FitnessRecord {
+  add: (record: Omit<FitnessRecord, 'id' | 'createdAt' | 'updatedAt'>): FitnessRecord => {
+    const records = FitnessStorage.getAll();
     const now = new Date().toISOString();
     const newRecord: FitnessRecord = {
       ...record,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const records = this.getAll();
     records.push(newRecord);
-    setItem(STORAGE_KEYS.FITNESS_RECORDS, records);
+    saveToStorage(STORAGE_KEYS.FITNESS_RECORDS, records);
+    UndoStorage.addAction('create', 'fitness', newRecord.id, undefined, newRecord);
     return newRecord;
   },
 
-  update(id: string, updates: Partial<FitnessRecord>): FitnessRecord | null {
-    const records = this.getAll();
-    const index = records.findIndex(f => f.id === id);
+  update: (id: string, updates: Partial<FitnessRecord>): FitnessRecord | null => {
+    const records = FitnessStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
     if (index === -1) return null;
-    records[index] = {
-      ...records[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.FITNESS_RECORDS, records);
+    
+    const beforeData = { ...records[index] };
+    records[index] = { ...records[index], ...updates, updatedAt: new Date().toISOString() };
+    saveToStorage(STORAGE_KEYS.FITNESS_RECORDS, records);
+    UndoStorage.addAction('update', 'fitness', id, beforeData, records[index]);
     return records[index];
   },
 
-  delete(id: string): boolean {
-    const records = this.getAll();
-    const filtered = records.filter(f => f.id !== id);
-    if (filtered.length === records.length) return false;
-    setItem(STORAGE_KEYS.FITNESS_RECORDS, filtered);
+  delete: (id: string): boolean => {
+    const records = FitnessStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    
+    const deleted = records[index];
+    records.splice(index, 1);
+    saveToStorage(STORAGE_KEYS.FITNESS_RECORDS, records);
+    UndoStorage.addAction('delete', 'fitness', id, deleted, undefined);
     return true;
-  },
+  }
 };
 
-// C3: 记账记录
+// ============================================
+// C轨：记账记录服务
+// ============================================
+
 export const AccountStorage = {
-  getAll(): AccountRecord[] {
-    return getItem<AccountRecord>(STORAGE_KEYS.ACCOUNT_RECORDS);
+  getAll: (): AccountRecord[] => {
+    return getFromStorage<AccountRecord[]>(STORAGE_KEYS.ACCOUNT_RECORDS, []);
   },
 
-  getByDate(date: string): AccountRecord[] {
-    return this.getAll().filter(a => a.date === date);
+  getByDate: (date: string): AccountRecord[] => {
+    const records = AccountStorage.getAll();
+    return records.filter(r => r.date === date);
   },
 
-  getByMonth(year: number, month: number): AccountRecord[] {
-    return this.getAll().filter(a => {
-      const d = new Date(a.date);
-      return d.getFullYear() === year && d.getMonth() === month;
-    });
+  getByType: (type: AccountType): AccountRecord[] => {
+    const records = AccountStorage.getAll();
+    return records.filter(r => r.type === type);
   },
 
-  getBalance(year: number, month: number): { income: number; expense: number; balance: number } {
-    const records = this.getByMonth(year, month);
-    const income = records.filter(r => r.type === 'income').reduce((sum, r) => sum + r.amount, 0);
-    const expense = records.filter(r => r.type === 'expense').reduce((sum, r) => sum + r.amount, 0);
-    return { income, expense, balance: income - expense };
-  },
-
-  add(record: Omit<AccountRecord, 'id' | 'createdAt' | 'updatedAt'>): AccountRecord {
+  add: (record: Omit<AccountRecord, 'id' | 'createdAt' | 'updatedAt'>): AccountRecord => {
+    const records = AccountStorage.getAll();
     const now = new Date().toISOString();
+    
+    // 自动判定标签
+    const tag = record.tag || autoDetectTag(
+      record.firstCategory as string,
+      record.note
+    );
+    
     const newRecord: AccountRecord = {
       ...record,
+      tag,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const records = this.getAll();
     records.push(newRecord);
-    setItem(STORAGE_KEYS.ACCOUNT_RECORDS, records);
+    saveToStorage(STORAGE_KEYS.ACCOUNT_RECORDS, records);
+    UndoStorage.addAction('create', 'account', newRecord.id, undefined, newRecord);
     return newRecord;
   },
 
-  update(id: string, updates: Partial<AccountRecord>): AccountRecord | null {
-    const records = this.getAll();
-    const index = records.findIndex(a => a.id === id);
+  update: (id: string, updates: Partial<AccountRecord>): AccountRecord | null => {
+    const records = AccountStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
     if (index === -1) return null;
-    records[index] = {
-      ...records[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.ACCOUNT_RECORDS, records);
-    return records[index];
+    
+    const beforeData = { ...records[index] };
+    const updated = { ...records[index], ...updates, updatedAt: new Date().toISOString() };
+    
+    // 重新计算标签
+    if (updates.firstCategory || updates.note) {
+      updated.tag = autoDetectTag(
+        (updates.firstCategory || updated.firstCategory) as string,
+        updates.note || updated.note
+      );
+    }
+    
+    records[index] = updated;
+    saveToStorage(STORAGE_KEYS.ACCOUNT_RECORDS, records);
+    UndoStorage.addAction('update', 'account', id, beforeData, updated);
+    return updated;
   },
 
-  delete(id: string): boolean {
-    const records = this.getAll();
-    const filtered = records.filter(a => a.id !== id);
-    if (filtered.length === records.length) return false;
-    setItem(STORAGE_KEYS.ACCOUNT_RECORDS, filtered);
+  delete: (id: string): boolean => {
+    const records = AccountStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    
+    const deleted = records[index];
+    records.splice(index, 1);
+    saveToStorage(STORAGE_KEYS.ACCOUNT_RECORDS, records);
+    UndoStorage.addAction('delete', 'account', id, deleted, undefined);
+    
+    // 删除关联：时间记录关联清空
+    if (deleted.timeRecordId) {
+      TimeStorage.unlinkAccount(deleted.timeRecordId, id);
+    }
     return true;
   },
+
+  // 取消时间记录关联
+  unlinkTimeRecord: (id: string): void => {
+    const records = AccountStorage.getAll();
+    const index = records.findIndex(r => r.id === id);
+    if (index !== -1) {
+      records[index].timeRecordId = undefined;
+      saveToStorage(STORAGE_KEYS.ACCOUNT_RECORDS, records);
+    }
+  },
+
+  // 获取某天的收支汇总
+  getDailySummary: (date: string): { income: number; expense: number } => {
+    const records = AccountStorage.getByDate(date);
+    return records.reduce(
+      (acc, r) => {
+        if (r.type === 'income') acc.income += r.amount;
+        else acc.expense += r.amount;
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
+  }
 };
 
-// ==================== 待办事项 ====================
+// ============================================
+// 待办事项服务
+// ============================================
+
 export const TodoStorage = {
-  getAll(): TodoItem[] {
-    return getItem<TodoItem>(STORAGE_KEYS.TODO_ITEMS);
+  getAll: (): TodoItem[] => {
+    return getFromStorage<TodoItem[]>(STORAGE_KEYS.TODOS, []);
   },
 
-  getByDate(date: string): TodoItem[] {
-    return this.getAll().filter(t => t.date === date);
+  getByDate: (date: string): TodoItem[] => {
+    const records = TodoStorage.getAll();
+    return records.filter(r => r.date === date);
   },
 
-  add(todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): TodoItem {
+  add: (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): TodoItem => {
+    const todos = TodoStorage.getAll();
     const now = new Date().toISOString();
     const newTodo: TodoItem = {
       ...todo,
       id: generateId(),
       createdAt: now,
-      updatedAt: now,
+      updatedAt: now
     };
-    const todos = this.getAll();
     todos.push(newTodo);
-    setItem(STORAGE_KEYS.TODO_ITEMS, todos);
+    saveToStorage(STORAGE_KEYS.TODOS, todos);
+    UndoStorage.addAction('create', 'todo', newTodo.id, undefined, newTodo);
     return newTodo;
   },
 
-  toggleComplete(id: string): TodoItem | null {
-    const todos = this.getAll();
+  update: (id: string, updates: Partial<TodoItem>): TodoItem | null => {
+    const todos = TodoStorage.getAll();
     const index = todos.findIndex(t => t.id === id);
     if (index === -1) return null;
-    todos[index] = {
-      ...todos[index],
-      isCompleted: !todos[index].isCompleted,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.TODO_ITEMS, todos);
-    return todos[index];
+    
+    const beforeData = { ...todos[index] };
+    const updated = { ...todos[index], ...updates, updatedAt: new Date().toISOString() };
+    todos[index] = updated;
+    saveToStorage(STORAGE_KEYS.TODOS, todos);
+    UndoStorage.addAction('update', 'todo', id, beforeData, updated);
+    
+    // 待办完成状态变更联动
+    if (updates.isCompleted !== undefined && updates.isCompleted !== beforeData.isCompleted) {
+      if (updates.isCompleted) {
+        // 标记完成：自动生成时间记录
+        if (updated.startTime && updated.endTime) {
+          const startTime = new Date(updated.startTime);
+          const endTime = new Date(updated.endTime);
+          const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+          
+          const timeRecord = TimeStorage.add({
+            title: updated.title,
+            firstCategory: updated.firstCategory,
+            secondCategory: updated.secondCategory,
+            thirdCategory: updated.thirdCategory,
+            startTime: updated.startTime,
+            endTime: updated.endTime,
+            duration,
+            date: updated.date,
+            isPlanned: true,
+            isCompleted: true,
+            todoId: id
+          });
+          
+          // 更新待办关联时间记录ID
+          updated.timeRecordId = timeRecord.id;
+          todos[index] = updated;
+          saveToStorage(STORAGE_KEYS.TODOS, todos);
+        }
+      } else {
+        // 取消完成：删除生成的时间记录
+        if (beforeData.timeRecordId) {
+          TimeStorage.delete(beforeData.timeRecordId);
+          updated.timeRecordId = undefined;
+          todos[index] = updated;
+          saveToStorage(STORAGE_KEYS.TODOS, todos);
+        }
+      }
+    }
+    
+    return updated;
   },
 
-  update(id: string, updates: Partial<TodoItem>): TodoItem | null {
-    const todos = this.getAll();
+  delete: (id: string): boolean => {
+    const todos = TodoStorage.getAll();
     const index = todos.findIndex(t => t.id === id);
-    if (index === -1) return null;
-    todos[index] = {
-      ...todos[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    setItem(STORAGE_KEYS.TODO_ITEMS, todos);
-    return todos[index];
-  },
-
-  delete(id: string): boolean {
-    const todos = this.getAll();
-    const filtered = todos.filter(t => t.id !== id);
-    if (filtered.length === todos.length) return false;
-    setItem(STORAGE_KEYS.TODO_ITEMS, filtered);
+    if (index === -1) return false;
+    
+    const deleted = todos[index];
+    todos.splice(index, 1);
+    saveToStorage(STORAGE_KEYS.TODOS, todos);
+    UndoStorage.addAction('delete', 'todo', id, deleted, undefined);
+    
+    // 删除关联的时间记录
+    if (deleted.timeRecordId) {
+      TimeStorage.delete(deleted.timeRecordId);
+    }
     return true;
   },
-};
 
-// ==================== 主题存储 ====================
-export const ThemeStorage = {
-  get(): 'light' | 'dark' {
-    if (typeof window === 'undefined') return 'light';
-    const theme = localStorage.getItem(STORAGE_KEYS.THEME);
-    return (theme as 'light' | 'dark') || 'light';
-  },
-
-  set(theme: 'light' | 'dark'): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.THEME, theme);
-  },
-
-  toggle(): 'light' | 'dark' {
-    const current = this.get();
-    const newTheme = current === 'light' ? 'dark' : 'light';
-    this.set(newTheme);
-    return newTheme;
-  },
-};
-
-// ==================== 数据导出/导入（备份功能） ====================
-export const DataExport = {
-  exportAll(): string {
-    const data = {
-      timeRecords: TimeRecordStorage.getAll(),
-      habits: HabitStorage.getAll(),
-      books: BookStorage.getAll(),
-      fitness: FitnessStorage.getAll(),
-      accounts: AccountStorage.getAll(),
-      todos: TodoStorage.getAll(),
-      exportDate: new Date().toISOString(),
-    };
-    return JSON.stringify(data, null, 2);
-  },
-
-  importAll(jsonData: string): boolean {
-    try {
-      const data = JSON.parse(jsonData);
-      if (data.timeRecords) setItem(STORAGE_KEYS.TIME_RECORDS, data.timeRecords);
-      if (data.habits) setItem(STORAGE_KEYS.HABIT_DAILY, data.habits);
-      if (data.books) setItem(STORAGE_KEYS.BOOK_RECORDS, data.books);
-      if (data.fitness) setItem(STORAGE_KEYS.FITNESS_RECORDS, data.fitness);
-      if (data.accounts) setItem(STORAGE_KEYS.ACCOUNT_RECORDS, data.accounts);
-      if (data.todos) setItem(STORAGE_KEYS.TODO_ITEMS, data.todos);
-      return true;
-    } catch {
-      return false;
+  // 取消待办与时间记录的关联（时间记录被手动删除时调用）
+  unlinkTimeRecord: (todoId: string): void => {
+    const todos = TodoStorage.getAll();
+    const index = todos.findIndex(t => t.id === todoId);
+    if (index !== -1) {
+      todos[index].timeRecordId = undefined;
+      todos[index].isCompleted = false; // 状态回退
+      saveToStorage(STORAGE_KEYS.TODOS, todos);
     }
   },
 
-  clearAll(): void {
-    if (typeof window === 'undefined') return;
+  // 切换完成状态
+  toggleComplete: (id: string): TodoItem | null => {
+    const todos = TodoStorage.getAll();
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return null;
+    return TodoStorage.update(id, { isCompleted: !todo.isCompleted });
+  }
+};
+
+// ============================================
+// 计划服务（四级：年/月/周/日）
+// ============================================
+
+export const PlanStorage = {
+  getAll: (): Plan[] => {
+    return getFromStorage<Plan[]>(STORAGE_KEYS.PLANS, []);
+  },
+
+  getByLevel: (level: 'year' | 'month' | 'week' | 'day'): Plan[] => {
+    const plans = PlanStorage.getAll();
+    return plans.filter(p => p.level === level);
+  },
+
+  add: (plan: Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>): Plan => {
+    const plans = PlanStorage.getAll();
+    const now = new Date().toISOString();
+    const newPlan: Plan = {
+      ...plan,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now
+    };
+    plans.push(newPlan);
+    saveToStorage(STORAGE_KEYS.PLANS, plans);
+    return newPlan;
+  },
+
+  update: (id: string, updates: Partial<Plan>): Plan | null => {
+    const plans = PlanStorage.getAll();
+    const index = plans.findIndex(p => p.id === id);
+    if (index === -1) return null;
+    
+    plans[index] = { ...plans[index], ...updates, updatedAt: new Date().toISOString() };
+    saveToStorage(STORAGE_KEYS.PLANS, plans);
+    return plans[index];
+  },
+
+  // 获取进度统计
+  getProgress: (): { year: number; month: number; week: number; day: number } => {
+    const plans = PlanStorage.getAll();
+    const now = new Date();
+    const currentYear = now.getFullYear().toString();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    // 计算本周（周一开始）
+    const dayOfWeek = now.getDay() || 7;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek + 1);
+    const weekStart = monday.toISOString().split('T')[0];
+    
+    const currentDay = now.toISOString().split('T')[0];
+    
+    const yearPlans = plans.filter(p => p.level === 'year' && p.date.startsWith(currentYear));
+    const monthPlans = plans.filter(p => p.level === 'month' && p.date.startsWith(currentMonth));
+    const weekPlans = plans.filter(p => p.level === 'week' && p.date >= weekStart);
+    const dayPlans = plans.filter(p => p.level === 'day' && p.date === currentDay);
+    
+    const calcPercentage = (list: Plan[]) => {
+      if (list.length === 0) return 0;
+      const completed = list.filter(p => p.isCompleted).length;
+      return Math.round((completed / list.length) * 100);
+    };
+    
+    return {
+      year: calcPercentage(yearPlans),
+      month: calcPercentage(monthPlans),
+      week: calcPercentage(weekPlans),
+      day: calcPercentage(dayPlans)
+    };
+  }
+};
+
+// ============================================
+// 撤销服务
+// ============================================
+
+export const UndoStorage = {
+  getAll: (): UndoAction[] => {
+    return getFromStorage<UndoAction[]>(STORAGE_KEYS.UNDO_ACTIONS, []);
+  },
+
+  addAction: (
+    actionType: 'create' | 'update' | 'delete',
+    entityType: 'time' | 'habit' | 'book' | 'fitness' | 'account' | 'todo' | 'plan',
+    entityId: string,
+    beforeData?: unknown,
+    afterData?: unknown
+  ): void => {
+    const actions = UndoStorage.getAll();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24小时后过期
+    
+    actions.push({
+      id: generateId(),
+      actionType,
+      entityType,
+      entityId,
+      beforeData,
+      afterData,
+      timestamp: now.toISOString(),
+      expiresAt: expiresAt.toISOString()
+    });
+    
+    // 只保留24小时内的操作
+    const validActions = actions.filter(a => new Date(a.expiresAt) > now);
+    saveToStorage(STORAGE_KEYS.UNDO_ACTIONS, validActions);
+  },
+
+  // 获取最近的操作（用于撤销）
+  getLastAction: (): UndoAction | null => {
+    const actions = UndoStorage.getAll();
+    if (actions.length === 0) return null;
+    return actions[actions.length - 1];
+  },
+
+  // 执行撤销
+  undo: (): boolean => {
+    const action = UndoStorage.getLastAction();
+    if (!action) return false;
+    
+    // 根据操作类型和实体类型执行撤销
+    // 这里简化处理，实际需要根据具体类型调用对应的存储方法
+    
+    // 移除已撤销的操作
+    const actions = UndoStorage.getAll();
+    const filtered = actions.filter(a => a.id !== action.id);
+    saveToStorage(STORAGE_KEYS.UNDO_ACTIONS, filtered);
+    
+    return true;
+  },
+
+  // 清理过期操作
+  cleanup: (): void => {
+    const actions = UndoStorage.getAll();
+    const now = new Date();
+    const validActions = actions.filter(a => new Date(a.expiresAt) > now);
+    saveToStorage(STORAGE_KEYS.UNDO_ACTIONS, validActions);
+  }
+};
+
+// ============================================
+// 主题服务
+// ============================================
+
+export const ThemeStorage = {
+  get: (): 'light' | 'dark' | 'system' => {
+    return getFromStorage<'light' | 'dark' | 'system'>(STORAGE_KEYS.THEME, 'system');
+  },
+
+  set: (theme: 'light' | 'dark' | 'system'): void => {
+    saveToStorage(STORAGE_KEYS.THEME, theme);
+  }
+};
+
+// ============================================
+// 数据导出/导入
+// ============================================
+
+export const DataExport = {
+  exportAll: (): AppData => {
+    return {
+      timeRecords: TimeStorage.getAll(),
+      habitRecords: HabitStorage.getAll(),
+      bookRecords: BookStorage.getAll(),
+      fitnessRecords: FitnessStorage.getAll(),
+      accountRecords: AccountStorage.getAll(),
+      todos: TodoStorage.getAll(),
+      plans: PlanStorage.getAll(),
+      undoActions: UndoStorage.getAll()
+    };
+  },
+
+  importAll: (data: AppData): void => {
+    saveToStorage(STORAGE_KEYS.TIME_RECORDS, data.timeRecords);
+    saveToStorage(STORAGE_KEYS.HABIT_RECORDS, data.habitRecords);
+    saveToStorage(STORAGE_KEYS.BOOK_RECORDS, data.bookRecords);
+    saveToStorage(STORAGE_KEYS.FITNESS_RECORDS, data.fitnessRecords);
+    saveToStorage(STORAGE_KEYS.ACCOUNT_RECORDS, data.accountRecords);
+    saveToStorage(STORAGE_KEYS.TODOS, data.todos);
+    saveToStorage(STORAGE_KEYS.PLANS, data.plans);
+    saveToStorage(STORAGE_KEYS.UNDO_ACTIONS, data.undoActions);
+  },
+
+  clearAll: (): void => {
     Object.values(STORAGE_KEYS).forEach(key => {
       localStorage.removeItem(key);
     });
-  },
+  }
 };

@@ -1,438 +1,407 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { useData } from '@/components/providers/data-provider';
-import { Card } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HabitUpdateModal } from '@/components/modals/habit-update-modal';
+import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Edit2 } from 'lucide-react';
+import { TodoStorage, HabitStorage } from '@/lib/storage';
+import type { TodoItem, HabitRecord, FirstCategory, HabitType } from '@/types';
+import { getCategoryColor, HABIT_CONFIG, getSecondCategories, getThirdCategories } from '@/types';
+import { TimeRecordModal } from '@/components/modals/time-record-modal';
 import { BookRecordModal } from '@/components/modals/book-record-modal';
 import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
-import { HABIT_CONFIGS, type TodoItem, type HabitDaily, type HabitType } from '@/types';
-
-// 图标组件
-function PlusIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-  );
-}
-
-function TrashIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6"/>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-    </svg>
-  );
-}
 
 export default function TodayPage() {
-  const {
-    todos,
-    habits,
-    bookRecords,
-    fitnessRecords,
-    currentDate,
-    initTodayHabits,
-    addTodo,
-    toggleTodoComplete,
-    deleteTodo,
-    updateHabitProgress,
-  } = useData();
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [habitRecord, setHabitRecord] = useState<HabitRecord | null>(null);
+  const [showAddTodo, setShowAddTodo] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
+  const [showBookModal, setShowBookModal] = useState(false);
+  const [showFitnessModal, setShowFitnessModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
-  // 初始化今日习惯
-  useEffect(() => {
-    initTodayHabits(currentDate);
-  }, [currentDate, initTodayHabits]);
-
-  // 弹窗状态
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-
-  // 新待办输入
+  // 新增待办表单
   const [newTodoTitle, setNewTodoTitle] = useState('');
-  const [newTodoPriority, setNewTodoPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [newTodoFirstCat, setNewTodoFirstCat] = useState<FirstCategory>('工作事务');
+  const [newTodoSecondCat, setNewTodoSecondCat] = useState('');
+  const [newTodoThirdCat, setNewTodoThirdCat] = useState('');
+  const [newTodoStartTime, setNewTodoStartTime] = useState('');
+  const [newTodoEndTime, setNewTodoEndTime] = useState('');
 
-  // 今日数据
-  const todayTodos = useMemo(() => {
-    return todos.filter(t => t.date === currentDate);
-  }, [todos, currentDate]);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
-  const todayHabits = useMemo(() => {
-    return habits.filter(h => h.date === currentDate);
-  }, [habits, currentDate]);
+  useEffect(() => {
+    if (!isClient) return;
+    loadData();
+  }, [isClient]);
 
-  const todayBooks = useMemo(() => {
-    return bookRecords.filter(b => b.date === currentDate);
-  }, [bookRecords, currentDate]);
+  const loadData = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setTodos(TodoStorage.getByDate(today));
+    setHabitRecord(HabitStorage.getOrCreateToday());
+  };
 
-  const todayFitness = useMemo(() => {
-    return fitnessRecords.filter(f => f.date === currentDate);
-  }, [fitnessRecords, currentDate]);
-
-  // 完成率统计
-  const todoCompleteRate = useMemo(() => {
-    if (todayTodos.length === 0) return 0;
-    return Math.round((todayTodos.filter(t => t.isCompleted).length / todayTodos.length) * 100);
-  }, [todayTodos]);
-
-  const habitCompleteRate = useMemo(() => {
-    if (todayHabits.length === 0) return 0;
-    return Math.round((todayHabits.filter(h => h.isCompleted).length / todayHabits.length) * 100);
-  }, [todayHabits]);
-
-  // 添加待办
   const handleAddTodo = () => {
     if (!newTodoTitle.trim()) return;
     
-    addTodo({
-      date: currentDate,
-      title: newTodoTitle.trim(),
+    const today = new Date().toISOString().split('T')[0];
+    const startTime = newTodoStartTime ? `${today}T${newTodoStartTime}:00` : undefined;
+    const endTime = newTodoEndTime ? `${today}T${newTodoEndTime}:00` : undefined;
+
+    TodoStorage.add({
+      title: newTodoTitle,
+      firstCategory: newTodoFirstCat,
+      secondCategory: newTodoSecondCat || getSecondCategories(newTodoFirstCat)[0] || '',
+      thirdCategory: newTodoThirdCat || undefined,
       isCompleted: false,
-      priority: newTodoPriority,
+      date: today,
+      startTime,
+      endTime
     });
-    
+
     setNewTodoTitle('');
-    setNewTodoPriority('medium');
+    setNewTodoStartTime('');
+    setNewTodoEndTime('');
+    setShowAddTodo(false);
+    loadData();
   };
 
-  // 日期显示
-  const dateDisplay = useMemo(() => {
-    const date = new Date(currentDate);
-    return {
-      full: `${date.getMonth() + 1}月${date.getDate()}日`,
-      weekday: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()],
-    };
-  }, [currentDate]);
+  const handleToggleComplete = (id: string) => {
+    TodoStorage.toggleComplete(id);
+    loadData();
+  };
+
+  const handleDeleteTodo = (id: string) => {
+    TodoStorage.delete(id);
+    loadData();
+  };
+
+  const handleUpdateHabit = (type: HabitType, value?: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (type === 'water' && value !== undefined) {
+      HabitStorage.updateWater(today, value);
+    } else if (type === 'supplements') {
+      HabitStorage.toggleSupplements(today);
+    } else if (type === 'journal') {
+      HabitStorage.toggleJournal(today);
+    }
+    
+    loadData();
+  };
+
+  if (!isClient) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">加载中...</div>
+      </div>
+    );
+  }
+
+  const today = new Date();
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const dateStr = `${today.getMonth() + 1}月${today.getDate()}日 周${weekdays[today.getDay()]}`;
 
   return (
-    <div className="min-h-screen bg-background animate-fade-in">
-      <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
-        {/* 页面标题 */}
-        <header className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-serif text-2xl md:text-3xl text-foreground">
-                {dateDisplay.full}
-              </h1>
-              <p className="text-muted-foreground text-sm mt-1">
-                {dateDisplay.weekday} · 待办事项与习惯追踪
-              </p>
+    <div className="px-4 py-6 max-w-md mx-auto pb-24">
+      {/* 页面标题 */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-serif font-bold">{dateStr}</h1>
+        <p className="text-sm text-muted-foreground">今日待办与习惯追踪</p>
+      </div>
+
+      {/* 三项习惯打卡 */}
+      <Card className="p-4 mb-6">
+        <h2 className="text-sm font-medium mb-3">今日习惯</h2>
+        <div className="space-y-3">
+          {/* 饮水 */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: HABIT_CONFIG.water.color }}
+            >
+              <span className="text-white text-xs">💧</span>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs font-mono">
-                待办 {todoCompleteRate}%
-              </Badge>
-              <Badge className="text-xs font-mono bg-[var(--habit-complete)]">
-                习惯 {habitCompleteRate}%
-              </Badge>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{HABIT_CONFIG.water.label}</div>
+              <div className="text-xs text-muted-foreground">
+                目标 {HABIT_CONFIG.water.target}ml
+              </div>
             </div>
-          </div>
-        </header>
-
-        {/* 三项习惯卡片 */}
-        <Card className="mb-4 p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">今日习惯</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {(['water', 'supplement', 'journal'] as const).map((habitType) => {
-              const habit = todayHabits.find((h: HabitDaily) => h.habitType === habitType);
-              const config = HABIT_CONFIGS[habitType];
-              const completed = habit?.completed || 0;
-              const target = config.target;
-              const percent = Math.min((completed / target) * 100, 100);
-              const isComplete = habit?.isCompleted || false;
-
-              return (
-                <button
-                  key={habitType}
-                  onClick={() => setActiveModal(`habit-${habitType}`)}
-                  className={`habit-card p-3 rounded-lg border-2 transition-all clickable ${
-                    isComplete
-                      ? 'border-[var(--habit-complete)] bg-[var(--habit-complete)]/10'
-                      : 'border-border bg-background hover:border-[var(--habit-complete)]/50'
-                  }`}
-                >
-                  <div className="text-center">
-                    <span className="text-2xl mb-2 block">{config.icon}</span>
-                    <p className="text-sm font-medium text-foreground">{config.name}</p>
-                    
-                    {/* 进度条 */}
-                    <div className="habit-progress mt-2">
-                      <div
-                        className="h-full rounded-full bg-[var(--habit-complete)] transition-all duration-300"
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                    
-                    <p className="text-xs font-mono text-muted-foreground mt-2">
-                      {completed}/{target}{config.unit}
-                    </p>
-                    
-                    {isComplete && (
-                      <p className="text-xs text-[var(--habit-complete)] mt-1">✓ 已完成</p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* 专项记录快捷入口 */}
-        <Card className="mb-4 p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">专项记录</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <button
-              onClick={() => setActiveModal('book')}
-              className="p-3 rounded-lg border border-border hover:border-[var(--reading-amber)] bg-[var(--reading-amber)]/5 transition-colors clickable text-center"
-            >
-              <span className="text-2xl mb-1 block">📚</span>
-              <p className="text-xs font-medium">阅读</p>
-              {todayBooks.length > 0 && (
-                <Badge variant="outline" className="text-xs mt-1 border-[var(--reading-amber)]">
-                  {todayBooks.reduce((sum, b) => sum + b.pagesRead, 0)}页
-                </Badge>
-              )}
-            </button>
-            
-            <button
-              onClick={() => setActiveModal('fitness')}
-              className="p-3 rounded-lg border border-border hover:border-[var(--fitness-coral)] bg-[var(--fitness-coral)]/5 transition-colors clickable text-center"
-            >
-              <span className="text-2xl mb-1 block">💪</span>
-              <p className="text-xs font-medium">健身</p>
-              {todayFitness.length > 0 && (
-                <Badge variant="outline" className="text-xs mt-1 border-[var(--fitness-coral)]">
-                  {todayFitness.reduce((sum, f) => sum + f.duration, 0)}分钟
-                </Badge>
-              )}
-            </button>
-            
-            <button
-              onClick={() => setActiveModal('account')}
-              className="p-3 rounded-lg border border-border hover:border-[var(--expense-orange)] bg-[var(--expense-orange)]/5 transition-colors clickable text-center"
-            >
-              <span className="text-2xl mb-1 block">💰</span>
-              <p className="text-xs font-medium">记账</p>
-            </button>
-          </div>
-        </Card>
-
-        {/* 待办事项 */}
-        <Card className="mb-4">
-          <div className="p-4 border-b border-border">
-            <h3 className="text-sm font-medium text-foreground">待办事项</h3>
-          </div>
-
-          {/* 新增待办输入 */}
-          <div className="p-4 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
-              <Input
-                placeholder="添加新待办..."
-                value={newTodoTitle}
-                onChange={(e) => setNewTodoTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddTodo()}
-                className="flex-1"
+              <input
+                type="number"
+                value={habitRecord?.water.amount || 0}
+                onChange={(e) => handleUpdateHabit('water', parseInt(e.target.value) || 0)}
+                className="w-16 h-8 px-2 text-sm text-center border rounded-[var(--radius-standard)]"
+                inputMode="numeric"
               />
-              
-              <Select
-                value={newTodoPriority}
-                onValueChange={(value) => setNewTodoPriority(value as 'high' | 'medium' | 'low')}
+              <span className="text-xs text-muted-foreground">ml</span>
+              {habitRecord?.water.completed && (
+                <Check className="w-4 h-4 text-habit-water" />
+              )}
+            </div>
+          </div>
+
+          {/* 保健品 */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: HABIT_CONFIG.supplements.color }}
+            >
+              <span className="text-white text-xs">💊</span>
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{HABIT_CONFIG.supplements.label}</div>
+              <div className="text-xs text-muted-foreground">每日打卡</div>
+            </div>
+            <Button
+              variant={habitRecord?.supplements.completed ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleUpdateHabit('supplements')}
+              style={habitRecord?.supplements.completed ? { backgroundColor: HABIT_CONFIG.supplements.color } : {}}
+            >
+              {habitRecord?.supplements.completed ? '已完成' : '打卡'}
+            </Button>
+          </div>
+
+          {/* 手帐 */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: HABIT_CONFIG.journal.color }}
+            >
+              <span className="text-white text-xs">📔</span>
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium">{HABIT_CONFIG.journal.label}</div>
+              <div className="text-xs text-muted-foreground">每日打卡</div>
+            </div>
+            <Button
+              variant={habitRecord?.journal.completed ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleUpdateHabit('journal')}
+              style={habitRecord?.journal.completed ? { backgroundColor: HABIT_CONFIG.journal.color } : {}}
+            >
+              {habitRecord?.journal.completed ? '已完成' : '打卡'}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* 待办事项 */}
+      <Card className="p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium">待办事项</h2>
+          <Button
+            size="sm"
+            onClick={() => setShowAddTodo(true)}
+            className="h-7 text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            添加
+          </Button>
+        </div>
+
+        {/* 添加待办表单 */}
+        {showAddTodo && (
+          <div className="mb-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
+            <input
+              type="text"
+              value={newTodoTitle}
+              onChange={(e) => setNewTodoTitle(e.target.value)}
+              placeholder="待办事项标题"
+              className="w-full h-9 px-3 text-sm border rounded-[var(--radius-standard)] mb-2"
+              autoFocus
+            />
+            
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <select
+                value={newTodoFirstCat}
+                onChange={(e) => {
+                  setNewTodoFirstCat(e.target.value as FirstCategory);
+                  setNewTodoSecondCat('');
+                  setNewTodoThirdCat('');
+                }}
+                className="h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
               >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">
-                    <span className="text-[var(--cinnabar-red)]">高</span>
-                  </SelectItem>
-                  <SelectItem value="medium">
-                    <span className="text-[var(--ink-blue)]">中</span>
-                  </SelectItem>
-                  <SelectItem value="low">
-                    <span className="text-muted-foreground">低</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                {(['学习成长', '工作事务', '运动健康', '休息娱乐', '外出出行', '生活日常', '其他'] as FirstCategory[]).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
               
-              <Button size="icon" onClick={handleAddTodo} disabled={!newTodoTitle.trim()}>
-                <PlusIcon className="w-4 h-4" />
+              <select
+                value={newTodoSecondCat}
+                onChange={(e) => setNewTodoSecondCat(e.target.value)}
+                className="h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
+              >
+                <option value="">选择二级分类</option>
+                {getSecondCategories(newTodoFirstCat).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label className="text-xs text-muted-foreground">开始时间</label>
+                <input
+                  type="time"
+                  value={newTodoStartTime}
+                  onChange={(e) => setNewTodoStartTime(e.target.value)}
+                  className="w-full h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">结束时间</label>
+                <input
+                  type="time"
+                  value={newTodoEndTime}
+                  onChange={(e) => setNewTodoEndTime(e.target.value)}
+                  className="w-full h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddTodo} className="flex-1 h-7 text-xs">
+                保存
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setShowAddTodo(false)} className="h-7 text-xs">
+                取消
               </Button>
             </div>
           </div>
+        )}
 
-          {/* 待办列表 */}
-          <ScrollArea className="h-[calc(100vh-520px)] md:h-[400px]">
-            <div className="p-2">
-              {todayTodos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  今日暂无待办事项
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {/* 未完成 */}
-                  {todayTodos
-                    .filter(t => !t.isCompleted)
-                    .sort((a, b) => {
-                      const priorityOrder = { high: 0, medium: 1, low: 2 };
-                      return priorityOrder[a.priority] - priorityOrder[b.priority];
-                    })
-                    .map((todo: TodoItem) => (
-                      <div
-                        key={todo.id}
-                        className="flex items-center gap-2 p-3 rounded-lg bg-background hover:bg-muted/50 transition-colors group"
-                      >
-                        <Checkbox
-                          checked={false}
-                          onCheckedChange={() => toggleTodoComplete(todo.id)}
-                        />
-                        
-                        <span className="flex-1 text-sm text-foreground">
-                          {todo.title}
-                        </span>
-                        
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            todo.priority === 'high'
-                              ? 'border-[var(--cinnabar-red)] text-[var(--cinnabar-red)]'
-                              : todo.priority === 'medium'
-                                ? 'border-[var(--ink-blue)] text-[var(--ink-blue)]'
-                                : ''
-                          }`}
-                        >
-                          {todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低'}
-                        </Badge>
-                        
-                        {todo.dueTime && (
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {todo.dueTime}
-                          </span>
-                        )}
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => deleteTodo(todo.id)}
-                        >
-                          <TrashIcon className="w-4 h-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    ))}
-                  
-                  {/* 已完成 */}
-                  {todayTodos.filter(t => t.isCompleted).length > 0 && (
-                    <div className="pt-2">
-                      <p className="text-xs text-muted-foreground px-3 py-1">
-                        已完成 ({todayTodos.filter(t => t.isCompleted).length})
-                      </p>
-                      
-                      {todayTodos
-                        .filter(t => t.isCompleted)
-                        .map((todo: TodoItem) => (
-                          <div
-                            key={todo.id}
-                            className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 transition-colors group"
-                          >
-                            <Checkbox
-                              checked={true}
-                              onCheckedChange={() => toggleTodoComplete(todo.id)}
-                            />
-                            
-                            <span className="flex-1 text-sm text-muted-foreground line-through">
-                              {todo.title}
-                            </span>
-                            
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => deleteTodo(todo.id)}
-                            >
-                              <TrashIcon className="w-4 h-4 text-muted-foreground" />
-                            </Button>
-                          </div>
-                        ))}
-                    </div>
+        {/* 待办列表 */}
+        <div className="space-y-2">
+          {todos.length === 0 ? (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              暂无待办事项，点击上方按钮添加
+            </div>
+          ) : (
+            todos.map(todo => (
+              <div
+                key={todo.id}
+                className={`flex items-center gap-3 p-3 rounded-[var(--radius-standard)] ${
+                  todo.isCompleted ? 'bg-muted/30' : 'bg-card border'
+                }`}
+              >
+                <button
+                  onClick={() => handleToggleComplete(todo.id)}
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    todo.isCompleted
+                      ? 'bg-primary border-primary'
+                      : 'border-muted-foreground/30'
+                  }`}
+                >
+                  {todo.isCompleted && (
+                    <Check className="w-3 h-3 text-primary-foreground" />
                   )}
+                </button>
+                
+                <div
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: getCategoryColor(todo.firstCategory) }}
+                />
+                
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm truncate ${
+                    todo.isCompleted ? 'line-through text-muted-foreground' : ''
+                  }`}>
+                    {todo.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {todo.secondCategory}
+                    {todo.startTime && (
+                      <span className="ml-2">
+                        {new Date(todo.startTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </ScrollArea>
-        </Card>
 
-        {/* 今日统计 */}
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-foreground mb-3">今日完成度</h3>
-          <div className="grid grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-mono font-bold text-[var(--ink-blue)]">
-                {todayTodos.filter(t => t.isCompleted).length}/{todayTodos.length}
-              </p>
-              <p className="text-xs text-muted-foreground">待办</p>
-            </div>
-            <div>
-              <p className="text-2xl font-mono font-bold text-[var(--habit-complete)]">
-                {todayHabits.filter(h => h.isCompleted).length}/3
-              </p>
-              <p className="text-xs text-muted-foreground">习惯</p>
-            </div>
-            <div>
-              <p className="text-2xl font-mono font-bold text-[var(--reading-amber)]">
-                {todayBooks.length > 0 ? '✓' : '○'}
-              </p>
-              <p className="text-xs text-muted-foreground">阅读</p>
-            </div>
-            <div>
-              <p className="text-2xl font-mono font-bold text-[var(--fitness-coral)]">
-                {todayFitness.length > 0 ? '✓' : '○'}
-              </p>
-              <p className="text-xs text-muted-foreground">健身</p>
-            </div>
-          </div>
-        </Card>
-      </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => handleDeleteTodo(todo.id)}
+                >
+                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
 
-      {/* 弹窗 */}
-      {activeModal?.startsWith('habit-') && (
-        <HabitUpdateModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={currentDate}
-          habitType={activeModal.split('-')[1] as HabitType}
-        />
-      )}
-      
-      {activeModal === 'book' && (
+      {/* 专项记录入口 */}
+      <Card className="p-4">
+        <h2 className="text-sm font-medium mb-3">专项记录</h2>
+        <div className="grid grid-cols-3 gap-3">
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => setShowBookModal(true)}
+          >
+            <Book className="w-5 h-5 text-habit-water" />
+            <span className="text-xs">阅读记录</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => setShowFitnessModal(true)}
+          >
+            <Dumbbell className="w-5 h-5 text-habit-supplements" />
+            <span className="text-xs">健身记录</span>
+          </Button>
+          
+          <Button
+            variant="outline"
+            className="h-20 flex-col gap-2"
+            onClick={() => setShowAccountModal(true)}
+          >
+            <Wallet className="w-5 h-5 text-habit-journal" />
+            <span className="text-xs">记账</span>
+          </Button>
+        </div>
+      </Card>
+
+      {/* 专项记录弹窗 */}
+      {showBookModal && (
         <BookRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={currentDate}
+          onClose={() => setShowBookModal(false)}
+          onSaved={() => {
+            setShowBookModal(false);
+            loadData();
+          }}
         />
       )}
-      
-      {activeModal === 'fitness' && (
+
+      {showFitnessModal && (
         <FitnessRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={currentDate}
+          onClose={() => setShowFitnessModal(false)}
+          onSaved={() => {
+            setShowFitnessModal(false);
+            loadData();
+          }}
         />
       )}
-      
-      {activeModal === 'account' && (
+
+      {showAccountModal && (
         <AccountRecordModal
-          isOpen={true}
-          onClose={() => setActiveModal(null)}
-          date={currentDate}
+          onClose={() => setShowAccountModal(false)}
+          onSaved={() => {
+            setShowAccountModal(false);
+            loadData();
+          }}
         />
       )}
     </div>

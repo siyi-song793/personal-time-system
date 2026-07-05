@@ -1,145 +1,169 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { useData } from '@/components/providers/data-provider';
-import type { BookRecord } from '@/types';
+import { BookStorage } from '@/lib/storage';
 
 interface BookRecordModalProps {
-  isOpen: boolean;
   onClose: () => void;
-  date: string;
-  editRecord?: BookRecord;
+  onSaved: () => void;
+  editData?: {
+    id: string;
+    bookName: string;
+    author?: string;
+    bookType?: string;
+    startPage?: number;
+    endPage?: number;
+    note?: string;
+    duration?: number;
+  };
 }
 
-export function BookRecordModal({ isOpen, onClose, date, editRecord }: BookRecordModalProps) {
-  const { addBookRecord, updateBookRecord } = useData();
-  
-  const [bookTitle, setBookTitle] = useState(editRecord?.bookTitle || '');
-  const [author, setAuthor] = useState(editRecord?.author || '');
-  const [pagesRead, setPagesRead] = useState(editRecord?.pagesRead || 0);
-  const [totalPages, setTotalPages] = useState(editRecord?.totalPages || 0);
-  const [readingTime, setReadingTime] = useState(editRecord?.readingTime || 0);
-  const [notes, setNotes] = useState(editRecord?.notes || '');
+export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalProps) {
+  const [bookName, setBookName] = useState(editData?.bookName || '');
+  const [author, setAuthor] = useState(editData?.author || '');
+  const [bookType, setBookType] = useState(editData?.bookType || '');
+  const [startPage, setStartPage] = useState(editData?.startPage?.toString() || '');
+  const [endPage, setEndPage] = useState(editData?.endPage?.toString() || '');
+  const [duration, setDuration] = useState(editData?.duration?.toString() || '');
+  const [note, setNote] = useState(editData?.note || '');
 
-  const handleSubmit = () => {
-    if (!bookTitle.trim()) return;
+  const handleSave = () => {
+    if (!bookName.trim()) return;
 
-    if (editRecord) {
-      updateBookRecord(editRecord.id, {
-        bookTitle,
+    const today = new Date().toISOString().split('T')[0];
+
+    if (editData) {
+      BookStorage.update(editData.id, {
+        bookName,
         author: author || undefined,
-        pagesRead,
-        totalPages: totalPages || undefined,
-        readingTime: readingTime || undefined,
-        notes: notes || undefined,
+        bookType: bookType || undefined,
+        startPage: startPage ? parseInt(startPage) : undefined,
+        endPage: endPage ? parseInt(endPage) : undefined,
+        duration: duration ? parseInt(duration) : undefined,
+        note: note || undefined
       });
     } else {
-      addBookRecord({
-        date,
-        bookTitle,
+      BookStorage.add({
+        bookName,
         author: author || undefined,
-        pagesRead,
-        totalPages: totalPages || undefined,
-        readingTime: readingTime || undefined,
-        notes: notes || undefined,
+        bookType: bookType || undefined,
+        startPage: startPage ? parseInt(startPage) : undefined,
+        endPage: endPage ? parseInt(endPage) : undefined,
+        duration: duration ? parseInt(duration) : undefined,
+        note: note || undefined,
+        date: today
       });
     }
 
-    onClose();
+    onSaved();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md modal-content">
+    <Dialog open onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>📚</span>
-            <span>{editRecord ? '编辑阅读记录' : '新增阅读记录'}</span>
-          </DialogTitle>
+          <DialogTitle>{editData ? '编辑阅读记录' : '新增阅读记录'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4">
+          {/* 书名 */}
           <div>
-            <Label htmlFor="bookTitle">书名</Label>
-            <Input
-              id="bookTitle"
-              placeholder="例如：原子习惯"
-              value={bookTitle}
-              onChange={(e) => setBookTitle(e.target.value)}
+            <label className="text-sm font-medium mb-1 block">书名 *</label>
+            <input
+              type="text"
+              value={bookName}
+              onChange={(e) => setBookName(e.target.value)}
+              placeholder="请输入书名"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
             />
           </div>
 
+          {/* 作者 */}
           <div>
-            <Label htmlFor="author">作者（可选）</Label>
-            <Input
-              id="author"
-              placeholder="例如：James Clear"
+            <label className="text-sm font-medium mb-1 block">作者</label>
+            <input
+              type="text"
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
+              placeholder="请输入作者"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="pagesRead">今日页数</Label>
-              <Input
-                id="pagesRead"
-                type="number"
-                min={0}
-                value={pagesRead}
-                onChange={(e) => setPagesRead(Number(e.target.value))}
-                className="font-mono"
-              />
-            </div>
-            <div>
-              <Label htmlFor="totalPages">总页数（可选）</Label>
-              <Input
-                id="totalPages"
-                type="number"
-                min={0}
-                value={totalPages}
-                onChange={(e) => setTotalPages(Number(e.target.value))}
-                className="font-mono"
-              />
-            </div>
-            <div>
-              <Label htmlFor="readingTime">时长(分钟)</Label>
-              <Input
-                id="readingTime"
-                type="number"
-                min={0}
-                value={readingTime}
-                onChange={(e) => setReadingTime(Number(e.target.value))}
-                className="font-mono"
-              />
-            </div>
-          </div>
-
+          {/* 类型 */}
           <div>
-            <Label htmlFor="notes">阅读笔记（可选）</Label>
-            <Textarea
-              id="notes"
-              placeholder="今日阅读心得..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+            <label className="text-sm font-medium mb-1 block">类型</label>
+            <input
+              type="text"
+              value={bookType}
+              onChange={(e) => setBookType(e.target.value)}
+              placeholder="如：小说、技术、历史等"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
             />
+          </div>
+
+          {/* 页码 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">起始页</label>
+              <input
+                type="number"
+                value={startPage}
+                onChange={(e) => setStartPage(e.target.value)}
+                placeholder="0"
+                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
+                inputMode="numeric"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">结束页</label>
+              <input
+                type="number"
+                value={endPage}
+                onChange={(e) => setEndPage(e.target.value)}
+                placeholder="0"
+                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+
+          {/* 阅读时长 */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">阅读时长（分钟）</label>
+            <input
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="0"
+              className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
+              inputMode="numeric"
+            />
+          </div>
+
+          {/* 笔记 */}
+          <div>
+            <label className="text-sm font-medium mb-1 block">笔记</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="记录你的阅读心得..."
+              className="w-full h-24 px-3 py-2 border rounded-[var(--radius-standard)] resize-none"
+            />
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="flex gap-2 pt-2">
+            <Button onClick={handleSave} className="flex-1">
+              保存
+            </Button>
+            <Button variant="outline" onClick={onClose}>
+              取消
+            </Button>
           </div>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} disabled={!bookTitle.trim()}>
-            {editRecord ? '保存' : '添加'}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

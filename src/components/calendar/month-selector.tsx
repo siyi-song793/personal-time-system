@@ -1,60 +1,65 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface MonthSelectorProps {
-  monthName: string;
-  onPrev: () => void;
-  onNext: () => void;
-  onToday: () => void;
+  currentDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
-// 图标组件
-function ChevronLeftIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6"/>
-    </svg>
-  );
-}
+export function MonthSelector({ currentDate, onDateChange }: MonthSelectorProps) {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth() + 1;
 
-function ChevronRightIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
-  );
-}
+  const goToPrevMonth = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() - 1);
+    onDateChange(newDate);
+  };
 
-export function MonthSelector({ monthName, onPrev, onNext, onToday }: MonthSelectorProps) {
+  const goToNextMonth = () => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + 1);
+    onDateChange(newDate);
+  };
+
+  const goToToday = () => {
+    onDateChange(new Date());
+  };
+
   return (
     <div className="flex items-center justify-between mb-4">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={goToPrevMonth}
+        className="h-8 w-8"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      
       <div className="flex items-center gap-2">
+        <span className="text-xl font-serif font-bold">
+          {year}年{month}月
+        </span>
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrev}
-          aria-label="上个月"
+          variant="outline"
+          size="sm"
+          onClick={goToToday}
+          className="text-xs h-6"
         >
-          <ChevronLeftIcon className="w-4 h-4" />
-        </Button>
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNext}
-          aria-label="下个月"
-        >
-          <ChevronRightIcon className="w-4 h-4" />
+          今天
         </Button>
       </div>
       
       <Button
-        variant="outline"
-        size="sm"
-        onClick={onToday}
+        variant="ghost"
+        size="icon"
+        onClick={goToNextMonth}
+        className="h-8 w-8"
       >
-        回到今天
+        <ChevronRight className="h-4 w-4" />
       </Button>
     </div>
   );

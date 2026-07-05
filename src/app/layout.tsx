@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import { Inspector } from 'react-dev-inspector';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { DataProvider } from '@/components/providers/data-provider';
@@ -56,7 +55,6 @@ export default function RootLayout({
       </head>
       <body className={`antialiased min-h-screen bg-background`}>
         <PWARegister />
-        {isDev && <Inspector />}
         <ThemeProvider>
           <DataProvider>
             <div className="flex flex-col min-h-screen pb-16 md:pb-0">

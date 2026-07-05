@@ -10,6 +10,7 @@ import { getCategoryColor, HABIT_CONFIG, getSecondCategories } from '@/types';
 import { BookRecordModal } from '@/components/modals/book-record-modal';
 import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
+import { TodoModal } from '@/components/modals/todo-modal';
 
 export default function TodayPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -18,6 +19,8 @@ export default function TodayPage() {
   const [showBookModal, setShowBookModal] = useState(false);
   const [showFitnessModal, setShowFitnessModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showTodoModal, setShowTodoModal] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
   const [showReview, setShowReview] = useState(false);
@@ -45,29 +48,7 @@ export default function TodayPage() {
     setProgress(PlanStorage.getProgress());
   };
 
-  const handleAddTodo = () => {
-    if (!newTodoTitle.trim()) return;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const startTime = newTodoStartTime ? `${today}T${newTodoStartTime}:00` : undefined;
-    const endTime = newTodoEndTime ? `${today}T${newTodoEndTime}:00` : undefined;
-
-    TodoStorage.add({
-      title: newTodoTitle,
-      firstCategory: newTodoFirstCat,
-      secondCategory: newTodoSecondCat || getSecondCategories(newTodoFirstCat)[0] || '',
-      isCompleted: false,
-      date: today,
-      startTime,
-      endTime
-    });
-
-    setNewTodoTitle('');
-    setNewTodoStartTime('');
-    setNewTodoEndTime('');
-    setShowAddTodo(false);
-    loadData();
-  };
+// handleAddTodo removed - now using TodoModal
 
   const handleToggleComplete = (id: string) => {
     TodoStorage.toggleComplete(id);
@@ -77,6 +58,16 @@ export default function TodayPage() {
   const handleDeleteTodo = (id: string) => {
     TodoStorage.delete(id);
     loadData();
+  };
+
+  const handleEditTodo = (todo: TodoItem) => {
+    setEditingTodo(todo);
+    setShowTodoModal(true);
+  };
+
+  const handleOpenAddTodo = () => {
+    setEditingTodo(null);
+    setShowTodoModal(true);
   };
 
   const handleUpdateHabit = (type: HabitType, value?: number) => {
@@ -235,75 +226,15 @@ export default function TodayPage() {
           </Button>
         </div>
 
-        {/* 添加待办表单 */}
-        {showAddTodo && (
-          <div className="mb-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
-            <input
-              type="text"
-              value={newTodoTitle}
-              onChange={(e) => setNewTodoTitle(e.target.value)}
-              placeholder="待办事项标题"
-              className="w-full h-9 px-3 text-sm border rounded-[var(--radius-standard)] mb-2"
-              autoFocus
-            />
-            
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <select
-                value={newTodoFirstCat}
-                onChange={(e) => {
-                  setNewTodoFirstCat(e.target.value as FirstCategory);
-                  setNewTodoSecondCat('');
-                }}
-                className="h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
-              >
-                {(['学习成长', '工作事务', '运动健康', '休息娱乐', '外出出行', '生活日常', '其他'] as FirstCategory[]).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              
-              <select
-                value={newTodoSecondCat}
-                onChange={(e) => setNewTodoSecondCat(e.target.value)}
-                className="h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
-              >
-                <option value="">选择二级分类</option>
-                {getSecondCategories(newTodoFirstCat).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="text-xs text-muted-foreground">开始时间</label>
-                <input
-                  type="time"
-                  value={newTodoStartTime}
-                  onChange={(e) => setNewTodoStartTime(e.target.value)}
-                  className="w-full h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">结束时间</label>
-                <input
-                  type="time"
-                  value={newTodoEndTime}
-                  onChange={(e) => setNewTodoEndTime(e.target.value)}
-                  className="w-full h-8 px-2 text-xs border rounded-[var(--radius-standard)]"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleAddTodo} className="flex-1 h-7 text-xs">
-                保存
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowAddTodo(false)} className="h-7 text-xs">
-                取消
-              </Button>
-            </div>
-          </div>
-        )}
+        {/* 待办弹窗 */}
+        <TodoModal
+          open={showAddTodo}
+          onOpenChange={setShowAddTodo}
+          onSave={() => {
+            setShowAddTodo(false);
+            loadData();
+          }}
+        />
 
         {/* 待办列表 */}
         <div className="space-y-2">

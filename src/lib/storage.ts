@@ -682,7 +682,7 @@ export const PlanStorage = {
     const yearPlans = plans.filter(p => p.level === 'year' && p.date.startsWith(currentYear));
     const monthPlans = plans.filter(p => p.level === 'month' && p.date.startsWith(currentMonth));
     const weekPlans = plans.filter(p => p.level === 'week' && p.date >= weekStart);
-    const dayPlans = plans.filter(p => p.level === 'day' && p.date === currentDay);
+    const dayPlans = plans.filter(p => p.level === 'today' && p.date === currentDay);
     
     const calcPercentage = (list: Plan[]) => {
       if (list.length === 0) return 0;

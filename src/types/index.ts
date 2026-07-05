@@ -250,6 +250,21 @@ export interface AccountRecord {
 // 待办事项
 // ============================================
 
+// 重要程度
+export type Priority = 'urgent' | 'important' | 'normal' | 'low';
+
+// 任务时段类型
+export type TaskTimeType = 'allDay' | 'fixedTime';
+
+// 归属计划层级
+export type PlanLevel = 'today' | 'week' | 'month' | 'year';
+
+// 提醒设置
+export type ReminderType = 'none' | 'date' | '10min' | '30min' | 'custom';
+
+// 重复周期
+export type RepeatType = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+
 export interface TodoItem {
   id: string;
   title: string;
@@ -257,25 +272,56 @@ export interface TodoItem {
   firstCategory: FirstCategory;
   secondCategory: string;
   thirdCategory?: string;
+  // 重要程度
+  priority: Priority;
+  // 任务时段类型
+  taskTimeType: TaskTimeType;
+  // 归属计划层级
+  planLevel: PlanLevel;
+  // 时间（固定时段任务）
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  // 日期
+  date: string; // YYYY-MM-DD
+  // 提醒设置
+  reminder?: ReminderType;
+  reminderTime?: string; // 自定义提醒时间
+  // 重复周期
+  repeat?: RepeatType;
+  repeatEndDate?: string; // 重复结束日期
   // 状态
   isCompleted: boolean;
-  date: string; // YYYY-MM-DD
-  // 时间（可选，有时间则进入时间轴）
-  startTime?: string;
-  endTime?: string;
+  completedAt?: string; // 完成时间
   // 关联
   timeRecordId?: string; // 完成后自动生成的时间记录ID
+  // 备注
+  note?: string;
   // 元数据
   createdAt: string;
   updatedAt: string;
-  note?: string;
 }
+
+// 重要程度配置
+export const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; order: number }> = {
+  urgent: { label: '紧急重要', color: '#EF4444', order: 1 },
+  important: { label: '重要', color: '#F59E0B', order: 2 },
+  normal: { label: '普通', color: '#10B981', order: 3 },
+  low: { label: '次要', color: '#6B7280', order: 4 }
+};
+
+// 归属计划配置
+export const PLAN_LEVEL_CONFIG: Record<PlanLevel, { label: string; days: number }> = {
+  today: { label: '今日计划', days: 0 },
+  week: { label: '周计划', days: 7 },
+  month: { label: '月度计划', days: 30 },
+  year: { label: '年度计划', days: 365 }
+};
 
 // ============================================
 // 计划（四级：年/月/周/日）
 // ============================================
 
-export type PlanLevel = 'year' | 'month' | 'week' | 'day';
+// PlanLevel 已在待办模块定义，此处复用
 
 export interface Plan {
   id: string;

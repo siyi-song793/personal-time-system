@@ -21,15 +21,6 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | null>(null);
   const [showReview, setShowReview] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isClient) return;
-    loadData();
-  }, [currentDate, isClient]);
-
   const loadData = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -40,6 +31,15 @@ export default function HomePage() {
     setHabitRecords(HabitStorage.getAll());
     setAccountRecords(AccountStorage.getAll());
   };
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+    loadData();
+  }, [currentDate, isClient]);
 
   const getDaysInMonth = (date: Date): CalendarDay[] => {
     const year = date.getFullYear();

@@ -9,19 +9,65 @@ interface CalendarGridProps {
   currentMonth: number;
   currentYear: number;
   onDayClick: (date: string) => void;
+  selectedCategory?: FirstCategory | null;
 }
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
-export function CalendarGrid({ days, currentMonth, currentYear, onDayClick }: CalendarGridProps) {
+export function CalendarGrid({ 
+  days, 
+  currentMonth,
+  currentYear,
+  onDayClick,
+  selectedCategory
+}: CalendarGridProps) {
+  // 计算日期的活跃度（基于时间记录时长）
+  const getActivityLevel = (day: CalendarDay): number => {
+    if (!day.timeRecords || day.timeRecords.length === 0) return 0;
+    const totalMinutes = day.timeRecords.reduce((sum, r) => sum + r.duration, 0);
+    // 0-60min: 1, 60-120min: 2, 120-240min: 3, 240min+: 4
+    if (totalMinutes >= 240) return 4;
+    if (totalMinutes >= 120) return 3;
+    if (totalMinutes >= 60) return 2;
+    if (totalMinutes > 0) return 1;
+    return 0;
+  };
+
+  // 获取日期的主要分类色点
+  const getCategoryDots = (day: CalendarDay): string[] => {
+    if (!day.timeRecords || day.timeRecords.length === 0) return [];
+    
+    // 如果选择了分类筛选，只显示该分类
+    if (selectedCategory) {
+      const hasCategory = day.timeRecords.some(r => r.firstCategory === selectedCategory);
+      return hasCategory ? [getCategoryColor(selectedCategory)] : [];
+    }
+    
+    // 获取所有出现的分类（去重，最多显示3个）
+    const categories = [...new Set(day.timeRecords.map(r => r.firstCategory))].slice(0, 3);
+    return categories.map(cat => getCategoryColor(cat));
+  };
+
+  // 获取记账笔数
+  const getAccountCount = (day: CalendarDay): number => {
+    return day.accountRecords?.length || 0;
+  };
+
+  // 判断是否应该灰度显示（分类筛选时）
+  const isDimmed = (day: CalendarDay): boolean => {
+    if (!selectedCategory) return false;
+    if (!day.timeRecords || day.timeRecords.length === 0) return true;
+    return !day.timeRecords.some(r => r.firstCategory === selectedCategory);
+  };
+
   return (
-    <div className="mt-4">
+    <div className="bg-card rounded-[var(--radius-standard)] p-3 shadow-[var(--shadow-sm)]">
       {/* 星期标题 */}
-      <div className="grid grid-cols-7 mb-2">
+      <div className="grid grid-cols-7 gap-1 mb-2">
         {WEEKDAYS.map(day => (
           <div
             key={day}
-            className="text-center text-xs text-muted-foreground py-1"
+            className="text-center text-xs font-medium text-muted-foreground py-1"
           >
             {day}
           </div>
@@ -30,91 +76,75 @@ export function CalendarGrid({ days, currentMonth, currentYear, onDayClick }: Ca
 
       {/* 日期网格 */}
       <div className="grid grid-cols-7 gap-1">
-        {days.map((day, index) => (
-          <DayCell
-            key={index}
-            day={day}
-            onClick={() => day.isCurrentMonth && onDayClick(day.date)}
-          />
-        ))}
+        {days.map((day, index) => {
+          const activityLevel = getActivityLevel(day);
+          const categoryDots = getCategoryDots(day);
+          const accountCount = getAccountCount(day);
+          const dimmed = isDimmed(day);
+          
+          // 活跃度背景色
+          const activityBg = activityLevel > 0 
+            ? `bg-muted-foreground/${activityLevel * 3 + 2}` 
+            : '';
+
+          return (
+            <button
+              key={index}
+              onClick={() => day.date && onDayClick(day.date)}
+              disabled={!day.isCurrentMonth}
+              className={cn(
+                'relative aspect-square rounded-[var(--radius-small)] flex flex-col items-center justify-center gap-0.5 transition-all',
+                day.isCurrentMonth 
+                  ? 'hover:bg-accent cursor-pointer' 
+                  : 'opacity-30 cursor-default',
+                day.isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background',
+                activityBg,
+                dimmed && 'opacity-40'
+              )}
+            >
+              {/* 分类色点 - 顶部 */}
+              {categoryDots.length > 0 && (
+                <div className="flex items-center gap-0.5 absolute top-0.5 left-1/2 -translate-x-1/2">
+                  {categoryDots.map((color, i) => (
+                    <div
+                      key={i}
+                      className="w-1 h-1 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* 日期数字 */}
+              <span className={cn(
+                'text-xs font-medium',
+                day.isToday ? 'text-primary' : 'text-foreground',
+                !day.isCurrentMonth && 'text-muted-foreground'
+              )}>
+                {day.day}
+              </span>
+
+              {/* 习惯打卡条 - 中间 */}
+              {day.hasHabitCompleted && (
+                <div className="w-3/4 h-[2px] rounded-full bg-habit-water" />
+              )}
+              {day.habitPartial && !day.hasHabitCompleted && (
+                <div className="w-1/2 h-[2px] rounded-full bg-habit-water/50" />
+              )}
+
+              {/* 记账标记 - 右下角 */}
+              {accountCount > 0 && (
+                <div className="absolute bottom-0.5 right-0.5 flex items-center gap-0.5">
+                  <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                  {accountCount > 0 && (
+                    <span className="text-[8px] text-muted-foreground/70">{accountCount}</span>
+                  )}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
-    </div>
-  );
-}
-
-interface DayCellProps {
-  day: CalendarDay;
-  onClick: () => void;
-}
-
-function DayCell({ day, onClick }: DayCellProps) {
-  // 获取主要分类颜色（取时长最长的分类）
-  const getMainCategoryColor = (): string => {
-    if (!day.timeRecords.length) return 'transparent';
-    
-    const categoryMinutes: Record<string, number> = {};
-    day.timeRecords.forEach(r => {
-      categoryMinutes[r.firstCategory] = (categoryMinutes[r.firstCategory] || 0) + r.duration;
-    });
-    
-    const mainCategory = Object.entries(categoryMinutes)
-      .sort((a, b) => b[1] - a[1])[0]?.[0] as FirstCategory;
-    
-    return getCategoryColor(mainCategory);
-  };
-
-  return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'relative aspect-square flex flex-col items-center justify-center rounded-[var(--radius-standard)] cursor-pointer transition-all',
-        'hover:bg-muted/50 active:scale-95',
-        !day.isCurrentMonth && 'opacity-30',
-        day.isToday && 'bg-primary/10 ring-1 ring-primary/30'
-      )}
-    >
-      {/* 日期数字 */}
-      <span className={cn(
-        'text-sm font-medium',
-        day.isToday && 'text-primary font-bold'
-      )}>
-        {day.day}
-      </span>
-
-      {/* 第一层：时序圆点 - 显示主要分类颜色 */}
-      {day.hasTimeRecord && (
-        <div 
-          className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: getMainCategoryColor() }}
-        />
-      )}
-
-      {/* 第二层：习惯底条 - 显示习惯完成状态 */}
-      {day.habits && (
-        <div className="absolute bottom-1 left-1 right-1 flex gap-0.5">
-          {day.habits.water.completed && (
-            <div className="flex-1 h-[var(--height-habit-bar)] rounded-sm bg-habit-water" />
-          )}
-          {day.habits.supplements.completed && (
-            <div className="flex-1 h-[var(--height-habit-bar)] rounded-sm bg-habit-supplements" />
-          )}
-          {day.habits.journal.completed && (
-            <div className="flex-1 h-[var(--height-habit-bar)] rounded-sm bg-habit-journal" />
-          )}
-        </div>
-      )}
-
-      {/* 第三层：记账角点 - 显示收支状态 */}
-      {day.hasAccountRecord && (
-        <div className="absolute top-1 left-1 flex gap-0.5">
-          {day.accountRecords.some(a => a.type === 'income') && (
-            <div className="w-1.5 h-1.5 rounded-full bg-account-income" />
-          )}
-          {day.accountRecords.some(a => a.type === 'expense') && (
-            <div className="w-1.5 h-1.5 rounded-full bg-account-expense" />
-          )}
-        </div>
-      )}
     </div>
   );
 }

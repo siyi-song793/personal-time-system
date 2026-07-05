@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { FitnessStorage } from '@/lib/storage';
@@ -11,56 +11,65 @@ interface FitnessRecordModalProps {
   editData?: {
     id: string;
     trainingType: string;
-    sets?: number;
-    weight?: number;
-    feeling?: string;
-    bodyWeight?: number;
+    subType?: string;
+    intensity?: string;
     duration?: number;
-    calories?: number;
-    distance?: number;
+    bodyWeight?: number;
+    feeling?: string;
   };
 }
 
+// 训练类型与细分类型映射
+const trainingTypeMap: Record<string, string[]> = {
+  '有氧训练': ['跑步', '骑行', '游泳', '舞蹈', '球类'],
+  '力量训练': ['上肢', '下肢', '核心', '全身'],
+  '拉伸': ['全身拉伸', '瑜伽/普拉提', '筋膜放松', '静态拉伸', '动态热身'],
+  '放松': ['全身拉伸', '瑜伽/普拉提', '筋膜放松', '静态拉伸', '动态热身'],
+};
+
+const intensityOptions = ['低', '中', '高', '极限'];
+
 export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecordModalProps) {
   const [trainingType, setTrainingType] = useState(editData?.trainingType || '');
-  const [sets, setSets] = useState(editData?.sets?.toString() || '');
-  const [weight, setWeight] = useState(editData?.weight?.toString() || '');
-  const [feeling, setFeeling] = useState(editData?.feeling || '');
-  const [bodyWeight, setBodyWeight] = useState(editData?.bodyWeight?.toString() || '');
+  const [subType, setSubType] = useState(editData?.subType || '');
+  const [intensity, setIntensity] = useState(editData?.intensity || '中');
   const [duration, setDuration] = useState(editData?.duration?.toString() || '');
-  const [calories, setCalories] = useState(editData?.calories?.toString() || '');
-  const [distance, setDistance] = useState(editData?.distance?.toString() || '');
+  const [bodyWeight, setBodyWeight] = useState(editData?.bodyWeight?.toString() || '');
+  const [feeling, setFeeling] = useState(editData?.feeling || '');
 
-  const trainingTypes = ['力量', '体态', '拉伸', '步行', '骑行', '游泳', '跑步', '瑜伽', '其他'];
+  // 获取当前训练类型的细分选项
+  const subTypes = useMemo(() => {
+    return trainingTypeMap[trainingType] || [];
+  }, [trainingType]);
+
+  // 切换训练类型时清空细分类型
+  const handleTrainingTypeChange = (type: string) => {
+    setTrainingType(type);
+    setSubType('');
+  };
+
+  // 必填校验
+  const isValid = trainingType && subType && intensity;
 
   const handleSave = () => {
-    if (!trainingType.trim()) return;
+    if (!isValid) return;
 
     const today = new Date().toISOString().split('T')[0];
 
+    const recordData = {
+      trainingType,
+      subType,
+      intensity,
+      duration: duration ? parseInt(duration) : undefined,
+      bodyWeight: bodyWeight ? parseFloat(bodyWeight) : undefined,
+      feeling: feeling || undefined,
+      date: today,
+    };
+
     if (editData) {
-      FitnessStorage.update(editData.id, {
-        trainingType,
-        sets: sets ? parseInt(sets) : undefined,
-        weight: weight ? parseFloat(weight) : undefined,
-        feeling: feeling || undefined,
-        bodyWeight: bodyWeight ? parseFloat(bodyWeight) : undefined,
-        duration: duration ? parseInt(duration) : undefined,
-        calories: calories ? parseInt(calories) : undefined,
-        distance: distance ? parseFloat(distance) : undefined
-      });
+      FitnessStorage.update(editData.id, recordData);
     } else {
-      FitnessStorage.add({
-        trainingType,
-        sets: sets ? parseInt(sets) : undefined,
-        weight: weight ? parseFloat(weight) : undefined,
-        feeling: feeling || undefined,
-        bodyWeight: bodyWeight ? parseFloat(bodyWeight) : undefined,
-        duration: duration ? parseInt(duration) : undefined,
-        calories: calories ? parseInt(calories) : undefined,
-        distance: distance ? parseFloat(distance) : undefined,
-        date: today
-      });
+      FitnessStorage.add(recordData);
     }
 
     onSaved();
@@ -68,24 +77,26 @@ export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecord
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editData ? '编辑健身记录' : '新增健身记录'}</DialogTitle>
+          <DialogTitle className="text-lg font-medium text-center">
+            {editData ? '编辑健身记录' : '新增健身记录'}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-5 py-2">
           {/* 训练类型 */}
           <div>
-            <label className="text-sm font-medium mb-2 block">训练类型 *</label>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">训练类型 *</label>
             <div className="flex flex-wrap gap-2">
-              {trainingTypes.map(type => (
+              {Object.keys(trainingTypeMap).map(type => (
                 <button
                   key={type}
-                  onClick={() => setTrainingType(type)}
-                  className={`px-3 py-1.5 text-xs rounded-full transition-all ${
+                  onClick={() => handleTrainingTypeChange(type)}
+                  className={`px-4 py-2 text-sm rounded-[var(--radius-pill)] transition-all ${
                     trainingType === type
-                      ? 'bg-habit-supplements text-white'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
                   }`}
                 >
                   {type}
@@ -94,105 +105,102 @@ export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecord
             </div>
           </div>
 
-          {/* 力量训练相关 */}
-          {(trainingType === '力量' || trainingType === '体态') && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">组数</label>
-                <input
-                  type="number"
-                  value={sets}
-                  onChange={(e) => setSets(e.target.value)}
-                  placeholder="0"
-                  className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                  inputMode="numeric"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">负重(kg)</label>
-                <input
-                  type="number"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  placeholder="0"
-                  className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                  inputMode="decimal"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 有氧运动相关 */}
-          {(trainingType === '步行' || trainingType === '骑行' || trainingType === '游泳' || trainingType === '跑步') && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium mb-1 block">距离(km)</label>
-                <input
-                  type="number"
-                  value={distance}
-                  onChange={(e) => setDistance(e.target.value)}
-                  placeholder="0"
-                  className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                  inputMode="decimal"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">消耗(kcal)</label>
-                <input
-                  type="number"
-                  value={calories}
-                  onChange={(e) => setCalories(e.target.value)}
-                  placeholder="0"
-                  className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                  inputMode="numeric"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 通用信息 */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium mb-1 block">时长(分钟)</label>
-              <input
-                type="number"
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="0"
-                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                inputMode="numeric"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">体重(kg)</label>
-              <input
-                type="number"
-                value={bodyWeight}
-                onChange={(e) => setBodyWeight(e.target.value)}
-                placeholder="0"
-                className="w-full h-10 px-3 border rounded-[var(--radius-standard)]"
-                inputMode="decimal"
-              />
+          {/* 细分类型 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">细分类型 *</label>
+            <div className="flex flex-wrap gap-2">
+              {subTypes.length === 0 ? (
+                <span className="text-sm text-muted-foreground/60">请先选择训练类型</span>
+              ) : (
+                subTypes.map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setSubType(type)}
+                    disabled={!trainingType}
+                    className={`px-4 py-2 text-sm rounded-[var(--radius-pill)] transition-all ${
+                      subType === type
+                        ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
-          {/* 感受 */}
+          {/* 时长 */}
           <div>
-            <label className="text-sm font-medium mb-1 block">训练感受</label>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">时长（分钟）</label>
+            <input
+              type="number"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="请输入时长"
+              className="w-full h-11 px-4 border border-border/50 rounded-[var(--radius-standard)] bg-background focus:border-habit-supplements/50 focus:ring-1 focus:ring-habit-supplements/20 transition-all"
+              inputMode="numeric"
+            />
+          </div>
+
+          {/* 每日体重 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">每日体重（kg）</label>
+            <input
+              type="number"
+              value={bodyWeight}
+              onChange={(e) => setBodyWeight(e.target.value)}
+              placeholder="请输入体重"
+              className="w-full h-11 px-4 border border-border/50 rounded-[var(--radius-standard)] bg-background focus:border-habit-supplements/50 focus:ring-1 focus:ring-habit-supplements/20 transition-all"
+              inputMode="decimal"
+            />
+          </div>
+
+          {/* 训练强度 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">训练强度 *</label>
+            <div className="flex gap-2">
+              {intensityOptions.map(level => (
+                <button
+                  key={level}
+                  onClick={() => setIntensity(level)}
+                  className={`flex-1 py-2.5 text-sm rounded-[var(--radius-pill)] transition-all ${
+                    intensity === level
+                      ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 备注 */}
+          <div>
+            <label className="text-sm font-medium mb-2 block text-foreground/80">备注</label>
             <textarea
               value={feeling}
               onChange={(e) => setFeeling(e.target.value)}
-              placeholder="记录你的训练感受..."
-              className="w-full h-20 px-3 py-2 border rounded-[var(--radius-standard)] resize-none"
+              placeholder="记录训练感受..."
+              className="w-full h-20 px-4 py-3 border border-border/50 rounded-[var(--radius-standard)] bg-background resize-none focus:border-habit-supplements/50 focus:ring-1 focus:ring-habit-supplements/20 transition-all"
             />
           </div>
 
           {/* 操作按钮 */}
-          <div className="flex gap-2 pt-2">
-            <Button onClick={handleSave} className="flex-1">
+          <div className="flex gap-3 pt-2">
+            <Button 
+              onClick={handleSave} 
+              className="flex-1 h-11 rounded-[var(--radius-pill)] bg-habit-supplements hover:bg-habit-supplements/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!isValid}
+            >
               保存
             </Button>
-            <Button variant="outline" onClick={onClose}>
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="flex-1 h-11 rounded-[var(--radius-pill)] border-border/50"
+            >
               取消
             </Button>
           </div>

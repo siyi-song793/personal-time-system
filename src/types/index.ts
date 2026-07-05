@@ -235,6 +235,7 @@ export interface AccountRecord {
   firstCategory: ExpenseFirstCategory | IncomeCategory;
   secondCategory?: string;
   amount: number;
+  account?: string; // 支付账户：微信/支付宝/银行卡/现金/信用卡/其他
   tag?: AccountTag; // 自动判定标签
   note?: string;
   // 关联

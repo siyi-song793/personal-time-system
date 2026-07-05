@@ -59,110 +59,111 @@
 }
 
 /* ============================================
-   主题色 - 纸张与墨水
+   主题色 - 莫兰迪极简风
+   设计理念：极简留白 + 轻量卡片化 + 莫兰迪低饱和美学
    ============================================ */
 :root {
-  /* 基础色 */
+  /* 基础色 - 纸张质感 */
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.25 0.02 260);
+  --background: oklch(0.99 0.002 80);
+  --foreground: oklch(0.35 0.02 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.25 0.02 260);
+  --card-foreground: oklch(0.35 0.02 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.25 0.02 260);
+  --popover-foreground: oklch(0.35 0.02 260);
   
-  /* 主色 - 墨水蓝 */
-  --primary: oklch(0.45 0.13 250);
+  /* 主色 - 莫兰迪蓝灰 */
+  --primary: oklch(0.55 0.08 250);
   --primary-foreground: oklch(0.98 0 0);
   
-  /* 次要色 */
-  --secondary: oklch(0.95 0.01 260);
-  --secondary-foreground: oklch(0.35 0.02 260);
+  /* 次要色 - 浅灰 */
+  --secondary: oklch(0.96 0.005 260);
+  --secondary-foreground: oklch(0.45 0.02 260);
   
-  /* 强调色 - 朱砂红 */
-  --accent: oklch(0.55 0.22 25);
+  /* 强调色 - 莫兰迪粉 */
+  --accent: oklch(0.75 0.08 25);
   --accent-foreground: oklch(0.98 0 0);
   
   /* 辅助色 - 暖灰 */
-  --muted: oklch(0.96 0.01 80);
-  --muted-foreground: oklch(0.55 0.02 60);
+  --muted: oklch(0.97 0.005 80);
+  --muted-foreground: oklch(0.55 0.015 60);
   
-  /* 警告/删除色 */
-  --destructive: oklch(0.55 0.2 25);
+  /* 警告/删除色 - 莫兰迪红 */
+  --destructive: oklch(0.65 0.12 25);
   
-  /* 边框与输入 */
-  --border: oklch(0.92 0.01 260);
-  --input: oklch(0.92 0.01 260);
+  /* 边框与输入 - 极浅灰 */
+  --border: oklch(0.94 0.005 260);
+  --input: oklch(0.94 0.005 260);
 }
 
 /* ============================================
-   深色主题 - 保持纸张质感
+   深色主题 - 莫兰迪极简风
    ============================================ */
 .dark {
-  --background: oklch(0.18 0.01 260);
-  --foreground: oklch(0.92 0.01 80);
-  --card: oklch(0.22 0.01 260);
-  --card-foreground: oklch(0.92 0.01 80);
-  --popover: oklch(0.22 0.01 260);
-  --popover-foreground: oklch(0.92 0.01 80);
-  --primary: oklch(0.65 0.12 250);
-  --primary-foreground: oklch(0.2 0.02 260);
-  --secondary: oklch(0.28 0.01 260);
-  --secondary-foreground: oklch(0.88 0.01 80);
-  --accent: oklch(0.6 0.18 25);
+  --background: oklch(0.2 0.008 260);
+  --foreground: oklch(0.88 0.008 80);
+  --card: oklch(0.24 0.008 260);
+  --card-foreground: oklch(0.88 0.008 80);
+  --popover: oklch(0.24 0.008 260);
+  --popover-foreground: oklch(0.88 0.008 80);
+  --primary: oklch(0.65 0.08 250);
+  --primary-foreground: oklch(0.2 0.01 260);
+  --secondary: oklch(0.3 0.008 260);
+  --secondary-foreground: oklch(0.85 0.008 80);
+  --accent: oklch(0.7 0.08 25);
   --accent-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.28 0.01 260);
-  --muted-foreground: oklch(0.65 0.02 60);
-  --destructive: oklch(0.6 0.18 25);
-  --border: oklch(0.32 0.01 260);
-  --input: oklch(0.32 0.01 260);
+  --muted: oklch(0.3 0.008 260);
+  --muted-foreground: oklch(0.65 0.015 60);
+  --destructive: oklch(0.65 0.12 25);
+  --border: oklch(0.32 0.008 260);
+  --input: oklch(0.32 0.008 260);
 }
 
 /* ============================================
-   行为三级分类色值（全时间模块通用）
+   行为三级分类色值（莫兰迪低饱和色系）
    ============================================ */
 :root {
-  /* 学习成长 */
-  --category-learning: #4285E4;
-  /* 工作事务 */
-  --category-work: #757575;
-  /* 运动健康 */
-  --category-sports: #34A853;
-  /* 休息娱乐 */
-  --category-entertainment: #A962FF;
-  /* 外出出行 */
-  --category-travel: #24C1E0;
-  /* 生活日常 */
-  --category-life: #FBBC05;
-  /* 其他 */
-  --category-other: #B8B8B8;
+  /* 学习成长 - 莫兰迪蓝 */
+  --category-learning: #7BA7D9;
+  /* 工作事务 - 莫兰迪灰 */
+  --category-work: #9E9E9E;
+  /* 运动健康 - 莫兰迪绿 */
+  --category-sports: #7FB896;
+  /* 休息娱乐 - 莫兰迪紫 */
+  --category-entertainment: #C4A6E8;
+  /* 外出出行 - 莫兰迪青 */
+  --category-travel: #7EC8D9;
+  /* 生活日常 - 莫兰迪黄 */
+  --category-life: #E8D08C;
+  /* 其他 - 浅灰 */
+  --category-other: #C8C8C8;
 }
 
 /* ============================================
-   习惯打卡颜色
+   习惯打卡颜色（莫兰迪色系）
    ============================================ */
 :root {
-  /* 饮水 - 蓝色 */
-  --habit-water: #4285E4;
-  /* 保健品 - 绿色 */
-  --habit-supplements: #34A853;
-  /* 手帐 - 橙色 */
-  --habit-journal: #FBBC05;
+  /* 饮水 - 莫兰迪蓝 */
+  --habit-water: #7BA7D9;
+  /* 保健品 - 莫兰迪绿 */
+  --habit-supplements: #7FB896;
+  /* 手帐 - 莫兰迪黄 */
+  --habit-journal: #E8D08C;
 }
 
 /* ============================================
-   记账收支颜色（独立子系统）
+   记账收支颜色（莫兰迪色系）
    ============================================ */
 :root {
-  /* 收入 - 薄荷绿 */
-  --account-income: #34A853;
-  /* 支出 - 暖橙 */
-  --account-expense: #FF6B35;
+  /* 收入 - 莫兰迪绿 */
+  --account-income: #7FB896;
+  /* 支出 - 莫兰迪橙 */
+  --account-expense: #E8A87C;
   
   /* 记账标签色 */
-  --tag-necessary: #4285E4;    /* 刚需消费 */
-  --tag-quality: #34A853;       /* 品质消费 */
-  --tag-impulse: #FF6B35;       /* 冲动消费 */
+  --tag-necessary: #7BA7D9;    /* 刚需消费 */
+  --tag-quality: #7FB896;       /* 品质消费 */
+  --tag-impulse: #E8A87C;       /* 冲动消费 */
 }
 
 /* ============================================

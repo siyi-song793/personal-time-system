@@ -6,9 +6,9 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { Button } from '@/components/ui/button';
 
 const navItems = [
-  { path: '/', label: '月历概览', icon: 'Calendar' },
+  { path: '/', label: '月历', icon: 'Calendar' },
+  { path: '/today', label: '待办', icon: 'CheckSquare' },
   { path: '/timeline', label: '时间轴', icon: 'Clock' },
-  { path: '/today', label: '今日待办', icon: 'CheckSquare' },
 ];
 
 // 简单图标组件
@@ -83,26 +83,26 @@ export function BottomNav() {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border md:top-0 md:bottom-auto md:border-t-0 md:border-b">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-t border-border/50 md:top-0 md:bottom-auto md:border-t-0 md:border-b md:shadow-sm">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between h-[66px]">
           {/* 桌面端标题 */}
-          <div className="hidden md:block font-serif text-lg text-foreground">
+          <div className="hidden md:block font-serif text-lg text-foreground/80">
             时间与习惯
           </div>
           
           {/* 导航项 */}
-          <div className="flex items-center gap-1 md:gap-4 flex-1 md:flex-none justify-center md:justify-end">
+          <div className="flex items-center gap-2 md:gap-6 flex-1 md:flex-none justify-around md:justify-end">
             {navItems.map((item) => {
               const isActive = pathname === item.path;
               return (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex flex-col md:flex-row items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                  className={`flex flex-col md:flex-row items-center gap-1 px-4 py-2 rounded-xl transition-all duration-200 ${
                     isActive
-                      ? 'text-ink-blue bg-accent'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'text-ink-blue bg-accent/60 shadow-sm'
+                      : 'text-muted-foreground/70 hover:text-foreground/80 hover:bg-muted/50'
                   }`}
                   style={{
                     color: isActive ? 'var(--ink-blue)' : undefined

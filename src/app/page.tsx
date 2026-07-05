@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { MonthSelector } from '@/components/calendar/month-selector';
 import { CalendarGrid } from '@/components/calendar/calendar-grid';
 import { DayDetailModal } from '@/components/calendar/day-detail-modal';
-import { ProgressCards } from '@/components/progress/progress-cards';
-import { TimeStorage, HabitStorage, AccountStorage, PlanStorage } from '@/lib/storage';
+import { TimeStorage, HabitStorage, AccountStorage } from '@/lib/storage';
 import type { TimeRecord, HabitRecord, AccountRecord, CalendarDay, FirstCategory } from '@/types';
 import { getCategoryColor, FIRST_CATEGORIES } from '@/types';
 
@@ -17,7 +16,6 @@ export default function HomePage() {
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>([]);
-  const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
   const [isClient, setIsClient] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | null>(null);
@@ -41,7 +39,6 @@ export default function HomePage() {
     setTimeRecords(TimeStorage.getByDateRange(startDate, endDate));
     setHabitRecords(HabitStorage.getAll());
     setAccountRecords(AccountStorage.getAll());
-    setProgress(PlanStorage.getProgress());
   };
 
   const getDaysInMonth = (date: Date): CalendarDay[] => {
@@ -182,11 +179,6 @@ export default function HomePage() {
       {/* 月度统计摘要 */}
       <div className="mt-4 text-center text-sm text-muted-foreground">
         <span>本月总耗时：<strong className="text-foreground">{getMonthlyTotalHours()}h</strong></span>
-      </div>
-
-      {/* 四维进度卡片 */}
-      <div className="mt-4">
-        <ProgressCards progress={progress} />
       </div>
 
       {/* 月历网格 - 三层渲染 + 分类筛选 */}

@@ -18,19 +18,21 @@ interface AccountRecordModalProps {
     amount: number;
     account?: string;
     note?: string;
+    tag?: AccountTag;
   };
 }
 
 // 支付账户选项
 const ACCOUNT_OPTIONS = ['微信', '支付宝', '银行卡', '现金', '信用卡', '其他'];
 
-// 快捷模板
-const QUICK_TEMPLATES = [
-  { label: '早餐', amount: 15, category: '饮食餐饮' as ExpenseFirstCategory },
-  { label: '午餐', amount: 25, category: '饮食餐饮' as ExpenseFirstCategory },
-  { label: '晚餐', amount: 30, category: '饮食餐饮' as ExpenseFirstCategory },
-  { label: '交通', amount: 10, category: '外出出行' as ExpenseFirstCategory },
-  { label: '咖啡', amount: 20, category: '饮食餐饮' as ExpenseFirstCategory },
+// 每月固定支出模板
+const FIXED_MONTHLY_EXPENSES = [
+  { label: '通讯费', amount: 50, category: '生活日常' as ExpenseFirstCategory },
+  { label: '房租/房贷', amount: 3000, category: '居家日常' as ExpenseFirstCategory },
+  { label: '水电燃气', amount: 200, category: '居家日常' as ExpenseFirstCategory },
+  { label: '物业费', amount: 300, category: '居家日常' as ExpenseFirstCategory },
+  { label: '网费', amount: 100, category: '生活日常' as ExpenseFirstCategory },
+  { label: '会员订阅', amount: 30, category: '娱乐购物' as ExpenseFirstCategory },
 ];
 
 export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecordModalProps) {
@@ -40,6 +42,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
   const [amount, setAmount] = useState(editData?.amount?.toString() || '');
   const [account, setAccount] = useState(editData?.account || '微信');
   const [note, setNote] = useState(editData?.note || '');
+  const [tag, setTag] = useState<AccountTag>(editData?.tag || autoDetectTag(editData?.firstCategory || '饮食餐饮', editData?.note || ''));
 
   const expenseCategories = Object.keys(EXPENSE_CATEGORIES) as ExpenseFirstCategory[];
   const incomeCategories = INCOME_CATEGORIES;
@@ -63,12 +66,13 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
     setSecondCategory('');
   };
 
-  // 应用快捷模板
-  const applyTemplate = (template: typeof QUICK_TEMPLATES[0]) => {
+  // 应用固定支出模板
+  const applyFixedExpense = (template: typeof FIXED_MONTHLY_EXPENSES[0]) => {
     setType('expense');
     setFirstCategory(template.category);
     setAmount(template.amount.toString());
     setSecondCategory('');
+    setTag('刚需消费');
   };
 
   // 必填校验
@@ -78,7 +82,6 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
     if (!isValid) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const tag = autoDetectTag(firstCategory, note);
 
     if (editData) {
       AccountStorage.update(editData.id, {
@@ -112,7 +115,8 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
     '冲动消费': 'var(--tag-impulse)'
   };
 
-  const currentTag = autoDetectTag(firstCategory, note);
+  // 根据分类自动建议标签
+  const suggestedTag = autoDetectTag(firstCategory, note);
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
@@ -212,18 +216,28 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
             </div>
           </div>
 
-          {/* 消费标签 */}
+          {/* 消费标签 - 可手动更改 */}
           {type === 'expense' && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground/80">消费标签</label>
-              <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
-                <span className="text-xs text-muted-foreground">自动识别：</span>
-                <span
-                  className="px-3 py-1 text-xs rounded-[var(--radius-pill)] text-white font-medium"
-                  style={{ backgroundColor: tagColors[currentTag] }}
-                >
-                  {currentTag}
-                </span>
+              <label className="text-sm font-medium mb-2 block text-foreground/80">
+                消费标签
+                <span className="text-xs text-muted-foreground ml-2">（建议：{suggestedTag}）</span>
+              </label>
+              <div className="flex gap-2">
+                {(['刚需消费', '品质消费', '冲动消费'] as AccountTag[]).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTag(t)}
+                    className={`flex-1 py-2.5 text-xs rounded-[var(--radius-pill)] transition-all font-medium ${
+                      tag === t
+                        ? 'text-white shadow-sm'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
+                    }`}
+                    style={tag === t ? { backgroundColor: tagColors[t] } : {}}
+                  >
+                    {t}
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -239,15 +253,15 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
             />
           </div>
 
-          {/* 快捷模板 */}
+          {/* 每月固定支出 */}
           {type === 'expense' && !editData && (
             <div>
-              <label className="text-sm font-medium mb-2 block text-foreground/80">快捷模板</label>
+              <label className="text-sm font-medium mb-2 block text-foreground/80">每月固定支出</label>
               <div className="flex flex-wrap gap-2">
-                {QUICK_TEMPLATES.map(template => (
+                {FIXED_MONTHLY_EXPENSES.map(template => (
                   <button
                     key={template.label}
-                    onClick={() => applyTemplate(template)}
+                    onClick={() => applyFixedExpense(template)}
                     className="px-3 py-1.5 text-xs rounded-[var(--radius-pill)] bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground/80 transition-all"
                   >
                     {template.label} ¥{template.amount}

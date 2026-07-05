@@ -53,11 +53,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 避免hydration不匹配
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }}>{children}</div>;
-  }
-
+  // 始终提供Context Provider，避免子组件无法访问useTheme
+  // 使用默认值避免hydration不匹配
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}

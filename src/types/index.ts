@@ -196,9 +196,9 @@ export interface BookRecord {
   id: string;
   bookName: string;
   author?: string;
-  bookType?: string; // 类型/分类
-  startPage?: number;
-  endPage?: number;
+  bookType?: string; // 类型/分类：文学小说/历史传记/哲学心理等
+  readingStatus?: 'reading' | 'finished' | 'want'; // 阅读状态：在读/已读完/想读
+  progress?: string; // 阅读进度：页数或百分比
   note?: string;
   date: string; // YYYY-MM-DD
   duration?: number; // 阅读时长（分钟）

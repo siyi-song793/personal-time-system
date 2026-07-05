@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark (&; isDarkMode, );
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* ============================================
    全局CSS变量 - 个人时间与习惯管理系统

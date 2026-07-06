@@ -84,14 +84,6 @@ export default function TodayPage() {
     loadData();
   };
 
-  if (!isClient) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">加载中...</div>
-      </div>
-    );
-  }
-
   const today = new Date();
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 周${weekdays[today.getDay()]}`;

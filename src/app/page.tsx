@@ -108,7 +108,7 @@ export default function HomePage() {
     };
   };
 
-  const days = isClient ? getDaysInMonth(currentDate) : [];
+  const days = getDaysInMonth(currentDate);
 
   // 计算月度总时长
   const getMonthlyTotalHours = () => {
@@ -120,14 +120,6 @@ export default function HomePage() {
   const handleDayClick = (date: string) => {
     setSelectedDate(date);
   };
-
-  if (!isClient) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">加载中...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="px-4 py-6 max-w-md mx-auto">

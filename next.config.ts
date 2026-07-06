@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'export',
   allowedDevOrigins: ['*.dev.coze.site'],
+  devIndicators: false,
   images: {
     remotePatterns: [
       {

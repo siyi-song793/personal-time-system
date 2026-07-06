@@ -55,7 +55,7 @@ export default function RootLayout({
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={`antialiased min-h-screen bg-background`}>
+      <body className={`antialiased min-h-screen bg-background`} suppressHydrationWarning>
         <PWARegister />
         <ThemeProvider>
           <DataProvider>

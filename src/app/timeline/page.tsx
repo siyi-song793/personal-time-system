@@ -80,14 +80,6 @@ export default function TimelinePage() {
     };
   };
 
-  if (!isClient) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">加载中...</div>
-      </div>
-    );
-  }
-
   const totalMinutes = sortedRecords.reduce((sum, r) => sum + r.duration, 0);
   const totalHours = Math.floor(totalMinutes / 60);
   const remainMinutes = totalMinutes % 60;

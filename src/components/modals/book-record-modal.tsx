@@ -92,21 +92,6 @@ export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalP
     setBookType(template.bookType);
   };
 
-  const handleWxImport = () => {
-    // 模拟微信读书导入
-    setShowWxImport(true);
-    // 实际项目中这里应该调用微信读书API
-    // 模拟导入数据
-    setTimeout(() => {
-      setBookName('《被讨厌的勇气》');
-      setAuthor('岸见一郎 / 古贺史健');
-      setReadingStatus('reading');
-      setProgress('128页');
-      setDuration('45');
-      setShowWxImport(false);
-    }, 1000);
-  };
-
   return (
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -115,17 +100,8 @@ export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalP
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* 功能按钮区 */}
+          {/* 功能按钮区 - 仅保留快捷模板 */}
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleWxImport}
-              disabled={showWxImport}
-              className="flex-1"
-            >
-              {showWxImport ? '导入中...' : '微信读书导入'}
-            </Button>
             <Button
               variant="outline"
               size="sm"

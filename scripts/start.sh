@@ -6,12 +6,11 @@ COZE_WORKSPACE_PATH="${COZE_WORKSPACE_PATH:-$(pwd)}"
 PORT=5000
 DEPLOY_RUN_PORT="${DEPLOY_RUN_PORT:-$PORT}"
 
-
 start_service() {
     cd "${COZE_WORKSPACE_PATH}"
-    echo "Starting HTTP service on port ${DEPLOY_RUN_PORT} for deploy..."
-    PORT=${DEPLOY_RUN_PORT} node dist/server.js
+    echo "Starting static file server on port ${DEPLOY_RUN_PORT}..."
+    npx serve out -l ${DEPLOY_RUN_PORT} -s --no-clipboard
 }
 
-echo "Starting HTTP service on port ${DEPLOY_RUN_PORT} for deploy..."
+echo "Starting static file server on port ${DEPLOY_RUN_PORT}..."
 start_service

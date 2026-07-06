@@ -31,9 +31,10 @@ interface TodoModalProps {
   todo?: TodoItem | null;
   onSave: (data: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   defaultDate?: string;
+  defaultPlanLevel?: PlanLevel;
 }
 
-export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: TodoModalProps) {
+export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate, defaultPlanLevel = 'today' }: TodoModalProps) {
   const isEdit = !!todo;
 
   // 表单状态
@@ -78,7 +79,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
       setThirdCategory('');
       setPriority('normal');
       setTaskTimeType('allDay');
-      setPlanLevel('today');
+      setPlanLevel(defaultPlanLevel);
       setStartTime('');
       setEndTime('');
       setDate(defaultDate || new Date().toISOString().split('T')[0]);
@@ -86,7 +87,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
       setRepeat('none');
       setNote('');
     }
-  }, [todo, defaultDate, open]);
+  }, [todo, defaultDate, defaultPlanLevel, open]);
 
   // 时间校验
   useEffect(() => {

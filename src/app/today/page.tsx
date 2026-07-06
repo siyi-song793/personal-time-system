@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Droplets, Edit } from 'lucide-react';
 import { TodoStorage, HabitStorage, PlanStorage, TimeStorage } from '@/lib/storage';
-import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType } from '@/types';
+import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType, PlanLevel } from '@/types';
 import { getCategoryColor, HABIT_CONFIG, getSecondCategories } from '@/types';
 import { BookRecordModal } from '@/components/modals/book-record-modal';
 import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
 import { TodoModal } from '@/components/modals/todo-modal';
 import { WaterRecordModal } from '@/components/modals/water-record-modal';
+import { FourGridProgressCards } from '@/components/progress/four-grid-progress-cards';
 
 export default function TodayPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -23,9 +24,12 @@ export default function TodayPage() {
   const [showTodoModal, setShowTodoModal] = useState(false);
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
   const [isClient, setIsClient] = useState(false);
-  const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
+  const [selectedLevel, setSelectedLevel] = useState<PlanLevel>('today');
   const [showReview, setShowReview] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
+
+  // 根据选中层级筛选待办
+  const filteredTodos = todos.filter(todo => todo.planLevel === selectedLevel);
 
   // 新增待办表单
   const [newTodoTitle, setNewTodoTitle] = useState('');
@@ -47,7 +51,6 @@ export default function TodayPage() {
     const today = new Date().toISOString().split('T')[0];
     setTodos(TodoStorage.getByDate(today));
     setHabitRecord(HabitStorage.getOrCreateToday());
-    setProgress(PlanStorage.getProgress());
   };
 
 // handleAddTodo removed - now using TodoModal
@@ -122,6 +125,18 @@ export default function TodayPage() {
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 周${weekdays[today.getDay()]}`;
 
+  // 计算各层级进度
+  const getProgress = (level: PlanLevel) => {
+    const levelTodos = todos.filter(t => t.planLevel === level);
+    const completed = levelTodos.filter(t => t.isCompleted).length;
+    return { completed, total: levelTodos.length };
+  };
+
+  const yearProgress = getProgress('year');
+  const monthProgress = getProgress('month');
+  const weekProgress = getProgress('week');
+  const todayProgress = getProgress('today');
+
   // 计算今日完成率
   const completedCount = todos.filter(t => t.isCompleted).length;
   const completionRate = todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0;
@@ -136,37 +151,15 @@ export default function TodayPage() {
         <button className="text-2xl">😊</button>
       </div>
 
-      {/* 四维进度卡片 - 横排 */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
-          <div className="text-xs text-muted-foreground">年度</div>
-          <div className="text-sm font-medium">{progress.year}%</div>
-          <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${progress.year}%` }} />
-          </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
-          <div className="text-xs text-muted-foreground">月度</div>
-          <div className="text-sm font-medium">{progress.month}%</div>
-          <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${progress.month}%` }} />
-          </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
-          <div className="text-xs text-muted-foreground">周</div>
-          <div className="text-sm font-medium">{progress.week}%</div>
-          <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${progress.week}%` }} />
-          </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
-          <div className="text-xs text-muted-foreground">今日</div>
-          <div className="text-sm font-medium">{completedCount}/{todos.length}</div>
-          <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full" style={{ width: `${completionRate}%` }} />
-          </div>
-        </div>
-      </div>
+      {/* 四宫格进度卡片 */}
+      <FourGridProgressCards
+        selectedLevel={selectedLevel}
+        onLevelChange={setSelectedLevel}
+        yearProgress={yearProgress}
+        monthProgress={monthProgress}
+        weekProgress={weekProgress}
+        todayProgress={todayProgress}
+      />
 
       {/* 今日习惯 - 横向三列 */}
       <Card className="p-3 mb-4">
@@ -245,6 +238,7 @@ export default function TodayPage() {
         <TodoModal
           open={showAddTodo}
           onOpenChange={setShowAddTodo}
+          defaultPlanLevel={selectedLevel}
           onSave={(data) => {
             TodoStorage.add(data);
             setShowAddTodo(false);
@@ -269,12 +263,12 @@ export default function TodayPage() {
 
         {/* 待办列表 */}
         <div className="space-y-2">
-          {todos.length === 0 ? (
+          {filteredTodos.length === 0 ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               暂无待办，点击右上角添加
             </div>
           ) : (
-            todos.map(todo => (
+            filteredTodos.map(todo => (
               <div
                 key={todo.id}
                 className={`flex items-center gap-3 p-3 rounded-[var(--radius-standard)] ${

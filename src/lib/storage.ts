@@ -12,7 +12,9 @@ import type {
   FirstCategory,
   AccountType,
   ExpenseFirstCategory,
-  IncomeCategory
+  IncomeCategory,
+  WaterDrink,
+  DrinkType
 } from '@/types';
 
 import { autoDetectTag } from '@/types';
@@ -237,6 +239,50 @@ export const HabitStorage = {
     
     return HabitStorage.update(record.id, {
       water: { completed: amount >= 2000, amount }
+    });
+  },
+
+  // 添加饮品记录
+  addWaterDrink: (date: string, drink: Omit<WaterDrink, 'id'>): { habit: HabitRecord; drink: WaterDrink } | null => {
+    const record = HabitStorage.getByDate(date);
+    const newDrink: WaterDrink = { ...drink, id: generateId() };
+    
+    if (!record) {
+      const habit = HabitStorage.add({
+        date,
+        water: { completed: drink.amount >= 2000, amount: drink.amount, drinks: [newDrink] },
+        supplements: { completed: false },
+        journal: { completed: false }
+      });
+      return habit ? { habit, drink: newDrink } : null;
+    }
+    
+    const existingDrinks = record.water.drinks || [];
+    const newAmount = record.water.amount + drink.amount;
+    const updated = HabitStorage.update(record.id, {
+      water: { completed: newAmount >= 2000, amount: newAmount, drinks: [...existingDrinks, newDrink] }
+    });
+    return updated ? { habit: updated, drink: newDrink } : null;
+  },
+
+  // 删除饮品记录
+  removeWaterDrink: (date: string, drinkId: string): HabitRecord | null => {
+    const record = HabitStorage.getByDate(date);
+    if (!record || !record.water.drinks) return record;
+    
+    const drink = record.water.drinks.find(d => d.id === drinkId);
+    if (!drink) return record;
+    
+    const newDrinks = record.water.drinks.filter(d => d.id !== drinkId);
+    const newAmount = Math.max(0, record.water.amount - drink.amount);
+    
+    // 删除关联的时间轴记录
+    if (drink.timeRecordId) {
+      TimeStorage.delete(drink.timeRecordId);
+    }
+    
+    return HabitStorage.update(record.id, {
+      water: { completed: newAmount >= 2000, amount: newAmount, drinks: newDrinks }
     });
   },
 

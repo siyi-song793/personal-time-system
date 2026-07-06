@@ -168,6 +168,19 @@ export interface TimeRecord {
 // B轨：习惯记录（主习惯表）
 // ============================================
 
+// 饮品类型
+export type DrinkType = '纯净水' | '茶' | '咖啡' | '果汁' | '奶茶' | '其他饮品';
+export const DRINK_TYPES: DrinkType[] = ['纯净水', '茶', '咖啡', '果汁', '奶茶', '其他饮品'];
+
+// 饮品记录
+export interface WaterDrink {
+  id: string;
+  type: DrinkType;
+  amount: number; // ml
+  time: string; // HH:mm
+  timeRecordId?: string; // 关联的时间轴记录ID
+}
+
 export interface HabitRecord {
   id: string;
   date: string; // YYYY-MM-DD
@@ -175,6 +188,7 @@ export interface HabitRecord {
   water: {
     completed: boolean;
     amount: number; // ml，目标2000ml
+    drinks?: WaterDrink[]; // 饮品记录明细
   };
   supplements: {
     completed: boolean;

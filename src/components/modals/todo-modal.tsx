@@ -17,6 +17,7 @@ import {
   type RepeatType,
   type FirstCategory,
   getSecondCategories,
+  getThirdCategories,
   PRIORITY_CONFIG,
   FIRST_CATEGORIES,
   PLAN_LEVEL_CONFIG,
@@ -39,6 +40,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
   const [title, setTitle] = useState('');
   const [firstCategory, setFirstCategory] = useState<FirstCategory | ''>('');
   const [secondCategory, setSecondCategory] = useState('');
+  const [thirdCategory, setThirdCategory] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
   const [taskTimeType, setTaskTimeType] = useState<TaskTimeType>('allDay');
   const [planLevel, setPlanLevel] = useState<PlanLevel>('today');
@@ -58,6 +60,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
       setTitle(todo.title);
       setFirstCategory(todo.firstCategory);
       setSecondCategory(todo.secondCategory);
+      setThirdCategory(todo.thirdCategory || '');
       setPriority(todo.priority);
       setTaskTimeType(todo.taskTimeType);
       setPlanLevel(todo.planLevel);
@@ -72,6 +75,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
       setTitle('');
       setFirstCategory('');
       setSecondCategory('');
+      setThirdCategory('');
       setPriority('normal');
       setTaskTimeType('allDay');
       setPlanLevel('today');
@@ -106,12 +110,16 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
 
   // 二级分类列表
   const secondCategories = firstCategory ? getSecondCategories(firstCategory) : [];
+  // 三级分类列表
+  const thirdCategories = firstCategory && secondCategory ? getThirdCategories(firstCategory, secondCategory) : [];
+  const thirdRequired = thirdCategories.length > 0;
 
   // 是否可以保存
   const canSave =
     title.trim() !== '' &&
     firstCategory !== '' &&
     secondCategory !== '' &&
+    (!thirdRequired || thirdCategory !== '') &&
     (taskTimeType === 'allDay' || (startTime && endTime && !timeError));
 
   // 提交
@@ -122,6 +130,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
       title: title.trim(),
       firstCategory,
       secondCategory,
+      thirdCategory: thirdRequired ? thirdCategory : undefined,
       priority,
       taskTimeType,
       planLevel,
@@ -169,8 +178,8 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
             />
           </div>
 
-          {/* 2. 一级分类、二级分类 */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* 2. 一级分类、二级分类、三级分类 */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label>
                 一级分类 <span className="text-destructive">*</span>
@@ -180,6 +189,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
                 onValueChange={(value) => {
                   setFirstCategory(value as FirstCategory);
                   setSecondCategory('');
+                  setThirdCategory('');
                 }}
               >
                 <SelectTrigger>
@@ -201,7 +211,10 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
               </Label>
               <Select
                 value={secondCategory}
-                onValueChange={setSecondCategory}
+                onValueChange={(value) => {
+                  setSecondCategory(value);
+                  setThirdCategory('');
+                }}
                 disabled={!firstCategory}
               >
                 <SelectTrigger>
@@ -209,6 +222,28 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
                 </SelectTrigger>
                 <SelectContent>
                   {secondCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>
+                三级分类 {thirdRequired && <span className="text-destructive">*</span>}
+              </Label>
+              <Select
+                value={thirdCategory}
+                onValueChange={setThirdCategory}
+                disabled={!firstCategory || !secondCategory || !thirdRequired}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={!secondCategory ? '请先选二级' : thirdRequired ? '选择三级分类' : '无需选择'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {thirdCategories.map((cat) => (
                     <SelectItem key={cat} value={cat}>
                       {cat}
                     </SelectItem>

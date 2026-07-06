@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, Book, Dumbbell, Wallet, Check, Trash2 } from 'lucide-react';
-import { TodoStorage, HabitStorage, PlanStorage } from '@/lib/storage';
-import type { TodoItem, HabitRecord, FirstCategory, HabitType } from '@/types';
+import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Droplets } from 'lucide-react';
+import { TodoStorage, HabitStorage, PlanStorage, TimeStorage } from '@/lib/storage';
+import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType } from '@/types';
 import { getCategoryColor, HABIT_CONFIG, getSecondCategories } from '@/types';
 import { BookRecordModal } from '@/components/modals/book-record-modal';
 import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
 import { TodoModal } from '@/components/modals/todo-modal';
+import { WaterRecordModal } from '@/components/modals/water-record-modal';
 
 export default function TodayPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -24,6 +25,7 @@ export default function TodayPage() {
   const [isClient, setIsClient] = useState(false);
   const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
   const [showReview, setShowReview] = useState(false);
+  const [showWaterModal, setShowWaterModal] = useState(false);
 
   // 新增待办表单
   const [newTodoTitle, setNewTodoTitle] = useState('');
@@ -84,6 +86,38 @@ export default function TodayPage() {
     loadData();
   };
 
+  const handleWaterConfirm = (drinkType: DrinkType, amount: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    // 创建时间轴记录
+    const timeRecord = TimeStorage.add({
+      title: `饮水 - ${drinkType} ${amount}ml`,
+      firstCategory: '生活日常',
+      secondCategory: '饮食保健',
+      thirdCategory: '饮水',
+      startTime: now.toISOString(),
+      endTime: now.toISOString(),
+      duration: Math.max(5, Math.round(amount / 30)),
+      date: today,
+      isPlanned: false,
+      isCompleted: true,
+      note: `${drinkType} ${amount}ml`,
+      tags: ['饮水', drinkType]
+    });
+    
+    // 添加饮品记录
+    HabitStorage.addWaterDrink(today, {
+      type: drinkType,
+      amount,
+      time: timeStr,
+      timeRecordId: timeRecord.id
+    });
+    
+    loadData();
+  };
+
   const today = new Date();
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
   const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 周${weekdays[today.getDay()]}`;
@@ -134,75 +168,64 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {/* 今日习惯 */}
-      <Card className="p-4 mb-4">
-        <h2 className="text-sm font-medium mb-3">今日习惯</h2>
-        <div className="space-y-3">
+      {/* 今日习惯 - 横向三列 */}
+      <Card className="p-3 mb-4">
+        <h2 className="text-sm font-medium mb-2">今日习惯</h2>
+        <div className="flex gap-2.5">
           {/* 饮水 */}
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: HABIT_CONFIG.water.color }}
-            >
-              <span className="text-white text-xs">💧</span>
+          <button
+            onClick={() => setShowWaterModal(true)}
+            className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-all hover:bg-muted/30 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-1.5">
+              <Droplets className="w-3.5 h-3.5" style={{ color: HABIT_CONFIG.water.color }} />
+              <span className="text-xs font-medium">{HABIT_CONFIG.water.label}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{HABIT_CONFIG.water.label}</div>
-              <div className="text-xs text-muted-foreground">目标 {HABIT_CONFIG.water.target}ml</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">[ {habitRecord?.water.amount || 0} / {HABIT_CONFIG.water.target} ] ml</span>
-              {habitRecord?.water.completed && (
-                <Check className="w-4 h-4 text-habit-water" />
-              )}
-            </div>
-          </div>
+            <span className={`text-[11px] ${habitRecord?.water.completed ? 'font-medium' : 'text-muted-foreground'}`}
+              style={habitRecord?.water.completed ? { color: HABIT_CONFIG.water.color } : {}}>
+              {habitRecord?.water.amount || 0}/{HABIT_CONFIG.water.target}ml
+            </span>
+          </button>
 
           {/* 保健品 */}
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: HABIT_CONFIG.supplements.color }}
-            >
-              <span className="text-white text-xs">💊</span>
+          <button
+            onClick={() => handleUpdateHabit('supplements')}
+            className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-all hover:bg-muted/30 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">💊</span>
+              <span className="text-xs font-medium">{HABIT_CONFIG.supplements.label}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{HABIT_CONFIG.supplements.label}</div>
-            </div>
-            <Button
-              variant={habitRecord?.supplements.completed ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleUpdateHabit('supplements')}
-              style={habitRecord?.supplements.completed ? { backgroundColor: HABIT_CONFIG.supplements.color } : {}}
-              className="h-7 text-xs"
-            >
-              {habitRecord?.supplements.completed ? '已完成' : '打卡'}
-            </Button>
-          </div>
+            <span className={`text-[11px] ${habitRecord?.supplements.completed ? 'font-medium' : 'text-muted-foreground'}`}
+              style={habitRecord?.supplements.completed ? { color: HABIT_CONFIG.supplements.color } : {}}>
+              {habitRecord?.supplements.completed ? '已打卡' : '未打卡'}
+            </span>
+          </button>
 
           {/* 手帐 */}
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: HABIT_CONFIG.journal.color }}
-            >
-              <span className="text-white text-xs">📔</span>
+          <button
+            onClick={() => handleUpdateHabit('journal')}
+            className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-all hover:bg-muted/30 active:scale-[0.98]"
+          >
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs">📔</span>
+              <span className="text-xs font-medium">{HABIT_CONFIG.journal.label}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{HABIT_CONFIG.journal.label}</div>
-            </div>
-            <Button
-              variant={habitRecord?.journal.completed ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleUpdateHabit('journal')}
-              style={habitRecord?.journal.completed ? { backgroundColor: HABIT_CONFIG.journal.color } : {}}
-              className="h-7 text-xs"
-            >
-              {habitRecord?.journal.completed ? '已完成' : '打卡'}
-            </Button>
-          </div>
+            <span className={`text-[11px] ${habitRecord?.journal.completed ? 'font-medium' : 'text-muted-foreground'}`}
+              style={habitRecord?.journal.completed ? { color: HABIT_CONFIG.journal.color } : {}}>
+              {habitRecord?.journal.completed ? '已打卡' : '未打卡'}
+            </span>
+          </button>
         </div>
       </Card>
+
+      {/* 饮水记录弹窗 */}
+      <WaterRecordModal
+        open={showWaterModal}
+        onOpenChange={setShowWaterModal}
+        onConfirm={handleWaterConfirm}
+        currentAmount={habitRecord?.water.amount || 0}
+      />
 
       {/* 待办事项 */}
       <Card className="p-4 mb-4">
@@ -224,6 +247,21 @@ export default function TodayPage() {
           onOpenChange={setShowAddTodo}
           onSave={() => {
             setShowAddTodo(false);
+            loadData();
+          }}
+        />
+
+        {/* 编辑待办弹窗 */}
+        <TodoModal
+          open={showTodoModal}
+          onOpenChange={setShowTodoModal}
+          todo={editingTodo}
+          onSave={(data) => {
+            if (editingTodo) {
+              TodoStorage.update(editingTodo.id, data);
+            }
+            setShowTodoModal(false);
+            setEditingTodo(null);
             loadData();
           }}
         />

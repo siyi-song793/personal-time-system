@@ -95,7 +95,7 @@ export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecord
                   onClick={() => handleTrainingTypeChange(type)}
                   className={`px-4 py-2 text-sm rounded-[var(--radius-pill)] transition-all ${
                     trainingType === type
-                      ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                      ? 'bg-habit-supplements text-foreground font-medium shadow-sm'
                       : 'bg-muted/50 text-foreground/70 hover:bg-muted/80'
                   }`}
                 >
@@ -119,7 +119,7 @@ export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecord
                     disabled={!trainingType}
                     className={`px-4 py-2 text-sm rounded-[var(--radius-pill)] transition-all ${
                       subType === type
-                        ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                        ? 'bg-habit-supplements text-foreground font-medium shadow-sm'
                         : 'bg-muted/50 text-foreground/70 hover:bg-muted/80 disabled:opacity-40 disabled:cursor-not-allowed'
                     }`}
                   >
@@ -166,7 +166,7 @@ export function FitnessRecordModal({ onClose, onSaved, editData }: FitnessRecord
                   onClick={() => setIntensity(level)}
                   className={`flex-1 py-2.5 text-sm rounded-[var(--radius-pill)] transition-all ${
                     intensity === level
-                      ? 'bg-habit-supplements text-white font-medium shadow-sm'
+                      ? 'bg-habit-supplements text-foreground font-medium shadow-sm'
                       : 'bg-muted/50 text-foreground/70 hover:bg-muted/80'
                   }`}
                 >

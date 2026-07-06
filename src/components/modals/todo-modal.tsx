@@ -150,18 +150,10 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between pb-4 border-b">
+        <DialogHeader className="pb-4 border-b">
           <DialogTitle className="text-lg font-medium">
             {isEdit ? '编辑任务' : '新增任务'}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

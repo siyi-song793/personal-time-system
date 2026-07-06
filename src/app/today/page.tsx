@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Droplets, Edit } from 'lucide-react';
 import { TodoStorage, HabitStorage, PlanStorage, TimeStorage } from '@/lib/storage';
-import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType, PlanLevel } from '@/types';
-import { getCategoryColor, HABIT_CONFIG, getSecondCategories, PLAN_LEVEL_CONFIG } from '@/types';
+import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType } from '@/types';
+import { getCategoryColor, HABIT_CONFIG, getSecondCategories } from '@/types';
 import { BookRecordModal } from '@/components/modals/book-record-modal';
 import { FitnessRecordModal } from '@/components/modals/fitness-record-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
@@ -26,7 +26,6 @@ export default function TodayPage() {
   const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
   const [showReview, setShowReview] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
-  const [planFilter, setPlanFilter] = useState<PlanLevel | 'all'>('today');
 
   // 新增待办表单
   const [newTodoTitle, setNewTodoTitle] = useState('');
@@ -220,34 +219,6 @@ export default function TodayPage() {
         </div>
       </Card>
 
-      {/* 四宫格进度卡片 */}
-      <Card className="p-3 mb-4">
-        <div className="grid grid-cols-4 gap-2">
-          {(['today', 'week', 'month', 'year'] as PlanLevel[]).map((level) => {
-            const config = PLAN_LEVEL_CONFIG[level];
-            const count = todos.filter(t => t.planLevel === level).length;
-            const completed = todos.filter(t => t.planLevel === level && t.isCompleted).length;
-            const isActive = planFilter === level;
-            return (
-              <button
-                key={level}
-                onClick={() => setPlanFilter(level)}
-                className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all active:scale-[0.98] ${
-                  isActive ? 'bg-primary/10 ring-1 ring-primary/30' : 'hover:bg-muted/50'
-                }`}
-              >
-                <span className={`text-[10px] mb-0.5 ${isActive ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                  {config.label}
-                </span>
-                <span className={`text-lg font-bold ${isActive ? 'text-primary' : 'text-foreground'}`}>
-                  {completed}/{count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
       {/* 饮水记录弹窗 */}
       <WaterRecordModal
         open={showWaterModal}
@@ -298,12 +269,12 @@ export default function TodayPage() {
 
         {/* 待办列表 */}
         <div className="space-y-2">
-          {todos.filter(t => planFilter === 'all' || t.planLevel === planFilter).length === 0 ? (
+          {todos.length === 0 ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               暂无待办，点击右上角添加
             </div>
           ) : (
-            todos.filter(t => planFilter === 'all' || t.planLevel === planFilter).map(todo => (
+            todos.map(todo => (
               <div
                 key={todo.id}
                 className={`flex items-center gap-3 p-3 rounded-[var(--radius-standard)] ${

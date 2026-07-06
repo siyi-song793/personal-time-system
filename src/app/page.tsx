@@ -5,6 +5,8 @@ import { MonthSelector } from '@/components/calendar/month-selector';
 import { CalendarGrid } from '@/components/calendar/calendar-grid';
 import { DayDetailModal } from '@/components/calendar/day-detail-modal';
 import { MonthlyAccountModal } from '@/components/modals/monthly-account-modal';
+import { MonthlyBookModal } from '@/components/modals/monthly-book-modal';
+import { MonthlyFitnessModal } from '@/components/modals/monthly-fitness-modal';
 import { AccountRecordModal } from '@/components/modals/account-record-modal';
 import { TimeStorage, HabitStorage, AccountStorage, BookStorage, FitnessStorage } from '@/lib/storage';
 import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, CalendarDay, FirstCategory } from '@/types';
@@ -25,6 +27,8 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [showMonthlyAccount, setShowMonthlyAccount] = useState(false);
+  const [showMonthlyBook, setShowMonthlyBook] = useState(false);
+  const [showMonthlyFitness, setShowMonthlyFitness] = useState(false);
   const [longPressDate, setLongPressDate] = useState<string | null>(null);
   const [showLongPressMenu, setShowLongPressMenu] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -143,51 +147,60 @@ export default function HomePage() {
         onViewModeChange={setViewMode}
       />
 
-      {/* 分类筛选栏 - 单行横向滑动 */}
-      <div className="mt-4 overflow-x-auto scrollbar-hide">
-        <div className="flex items-center gap-2 min-w-max pb-2">
-          {FIRST_CATEGORIES.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                selectedCategory === cat 
-                  ? 'ring-2 ring-offset-1 ring-offset-background' 
-                  : 'opacity-70 hover:opacity-100'
-              }`}
-              style={{ 
-                backgroundColor: getCategoryColor(cat) + '20',
-                color: getCategoryColor(cat),
-                ...(selectedCategory === cat ? { ringColor: getCategoryColor(cat) } : {})
-              }}
-            >
-              <div 
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: getCategoryColor(cat) }}
-              />
-              <span>{cat}</span>
-            </button>
-          ))}
+      {/* 筛选 + 胶囊统一单行区域 */}
+      <div className="mt-4 flex items-center gap-3">
+        {/* 左侧：一级分类筛选（可滚动） */}
+        <div className="flex-1 overflow-x-auto scrollbar-hide min-w-0">
+          <div className="flex items-center gap-2 min-w-max">
+            {FIRST_CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  selectedCategory === cat 
+                    ? 'ring-2 ring-offset-1 ring-offset-background border-transparent' 
+                    : 'border-border/50 opacity-70 hover:opacity-100'
+                }`}
+                style={{ 
+                  backgroundColor: getCategoryColor(cat) + '15',
+                  color: getCategoryColor(cat),
+                  ...(selectedCategory === cat ? { ringColor: getCategoryColor(cat) } : {})
+                }}
+              >
+                <div 
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: getCategoryColor(cat) }}
+                />
+                <span>{cat}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 专项胶囊 - 独立一行居中 */}
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <button className="flex items-center gap-1.5 px-4 py-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full text-xs font-medium hover:bg-amber-500/20 transition-colors">
-          <span>📖</span>
-          <span>阅读</span>
-        </button>
-        <button className="flex items-center gap-1.5 px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 rounded-full text-xs font-medium hover:bg-green-500/20 transition-colors">
-          <span>🏃‍♂️</span>
-          <span>健身</span>
-        </button>
-        <button 
-          onClick={() => setShowMonthlyAccount(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium hover:bg-blue-500/20 transition-colors"
-        >
-          <span>💰</span>
-          <span>记账</span>
-        </button>
+        {/* 右侧：专项胶囊（固定3个） */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button 
+            onClick={() => setShowMonthlyBook(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-reading/15 text-reading rounded-full text-xs font-medium hover:bg-reading/25 transition-colors"
+          >
+            <span>📖</span>
+            <span>阅读</span>
+          </button>
+          <button 
+            onClick={() => setShowMonthlyFitness(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-fitness/15 text-fitness rounded-full text-xs font-medium hover:bg-fitness/25 transition-colors"
+          >
+            <span>🏃‍♂️</span>
+            <span>健身</span>
+          </button>
+          <button 
+            onClick={() => setShowMonthlyAccount(true)}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-500/15 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium hover:bg-blue-500/25 transition-colors"
+          >
+            <span>💰</span>
+            <span>记账</span>
+          </button>
+        </div>
       </div>
 
       {/* 月度统计摘要 */}
@@ -319,6 +332,24 @@ export default function HomePage() {
         open={showMonthlyAccount}
         onOpenChange={setShowMonthlyAccount}
         records={accountRecords}
+        currentMonth={currentDate}
+        onRecordClick={(date) => setSelectedDate(date)}
+      />
+
+      {/* 月度阅读汇总弹窗 */}
+      <MonthlyBookModal
+        open={showMonthlyBook}
+        onOpenChange={setShowMonthlyBook}
+        records={bookRecords}
+        currentMonth={currentDate}
+        onRecordClick={(date) => setSelectedDate(date)}
+      />
+
+      {/* 月度健身汇总弹窗 */}
+      <MonthlyFitnessModal
+        open={showMonthlyFitness}
+        onOpenChange={setShowMonthlyFitness}
+        records={fitnessRecords}
         currentMonth={currentDate}
         onRecordClick={(date) => setSelectedDate(date)}
       />

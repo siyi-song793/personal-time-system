@@ -13,6 +13,28 @@ import { AccountRecordModal } from '@/components/modals/account-record-modal';
 import { TodoModal } from '@/components/modals/todo-modal';
 import { WaterRecordModal } from '@/components/modals/water-record-modal';
 
+// 心情类型
+type MoodType = 'happy' | 'calm' | 'emo';
+const MOOD_EMOJIS: Record<MoodType, string> = {
+  happy: '😊',
+  calm: '😌',
+  emo: '😔',
+};
+const MOOD_LABELS: Record<MoodType, string> = {
+  happy: '开心',
+  calm: '平静',
+  emo: 'emo',
+};
+
+// 四宫格层级
+type GridLevel = 'year' | 'month' | 'week' | 'day';
+const GRID_LEVEL_LABELS: Record<GridLevel, string> = {
+  year: '年度',
+  month: '月度',
+  week: '周',
+  day: '今日',
+};
+
 export default function TodayPage() {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [habitRecord, setHabitRecord] = useState<HabitRecord | null>(null);
@@ -26,6 +48,8 @@ export default function TodayPage() {
   const [progress, setProgress] = useState({ year: 0, month: 0, week: 0, day: 0 });
   const [showReview, setShowReview] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
+  const [mood, setMood] = useState<MoodType>('calm');
+  const [selectedLevel, setSelectedLevel] = useState<GridLevel>('day');
 
   // 新增待办表单
   const [newTodoTitle, setNewTodoTitle] = useState('');
@@ -126,6 +150,11 @@ export default function TodayPage() {
   const completedCount = todos.filter(t => t.isCompleted).length;
   const completionRate = todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0;
 
+  // 根据选中的层级筛选待办
+  const filteredTodos = selectedLevel === 'day'
+    ? todos.filter(t => t.planLevel === 'today')
+    : todos.filter(t => t.planLevel === selectedLevel);
+
   return (
     <div className="px-4 py-6 max-w-md mx-auto pb-24">
       {/* 页面标题 + 心情 */}
@@ -133,39 +162,62 @@ export default function TodayPage() {
         <div>
           <h1 className="text-lg font-serif font-medium">{dateStr}</h1>
         </div>
-        <button className="text-2xl">😊</button>
+        <button
+          className="text-2xl active:scale-90 transition-transform"
+          onClick={() => {
+            const moods: MoodType[] = ['happy', 'calm', 'emo'];
+            const currentIndex = moods.indexOf(mood);
+            const nextIndex = (currentIndex + 1) % moods.length;
+            setMood(moods[nextIndex]);
+          }}
+          title={MOOD_LABELS[mood]}
+        >
+          {MOOD_EMOJIS[mood]}
+        </button>
       </div>
 
-      {/* 四维进度卡片 - 横排 */}
+      {/* 四维进度卡片 - 横排，可点击筛选 */}
       <div className="grid grid-cols-4 gap-2 mb-4">
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
+        <button
+          onClick={() => setSelectedLevel('year')}
+          className={`bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)] transition-all ${selectedLevel === 'year' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+        >
           <div className="text-xs text-muted-foreground">年度</div>
           <div className="text-sm font-medium">{progress.year}%</div>
           <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full" style={{ width: `${progress.year}%` }} />
           </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
+        </button>
+        <button
+          onClick={() => setSelectedLevel('month')}
+          className={`bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)] transition-all ${selectedLevel === 'month' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+        >
           <div className="text-xs text-muted-foreground">月度</div>
           <div className="text-sm font-medium">{progress.month}%</div>
           <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full" style={{ width: `${progress.month}%` }} />
           </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
+        </button>
+        <button
+          onClick={() => setSelectedLevel('week')}
+          className={`bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)] transition-all ${selectedLevel === 'week' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+        >
           <div className="text-xs text-muted-foreground">周</div>
           <div className="text-sm font-medium">{progress.week}%</div>
           <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full" style={{ width: `${progress.week}%` }} />
           </div>
-        </div>
-        <div className="bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)]">
+        </button>
+        <button
+          onClick={() => setSelectedLevel('day')}
+          className={`bg-card rounded-[var(--radius-standard)] p-2 text-center shadow-[var(--shadow-sm)] transition-all ${selectedLevel === 'day' ? 'ring-2 ring-primary' : 'hover:bg-muted/30'}`}
+        >
           <div className="text-xs text-muted-foreground">今日</div>
           <div className="text-sm font-medium">{completedCount}/{todos.length}</div>
           <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full" style={{ width: `${completionRate}%` }} />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* 今日习惯 - 横向三列 */}
@@ -269,12 +321,12 @@ export default function TodayPage() {
 
         {/* 待办列表 */}
         <div className="space-y-2">
-          {todos.length === 0 ? (
+          {filteredTodos.length === 0 ? (
             <div className="text-center py-6 text-sm text-muted-foreground">
               暂无待办，点击右上角添加
             </div>
           ) : (
-            todos.map(todo => (
+            filteredTodos.map(todo => (
               <div
                 key={todo.id}
                 className={`flex items-center gap-3 p-3 rounded-[var(--radius-standard)] ${

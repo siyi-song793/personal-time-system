@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { BookStorage } from '@/lib/storage';
+import { BookStorage, TimeStorage } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 
 // 阅读状态选项
@@ -59,6 +59,7 @@ export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalP
     if (!isValid) return;
 
     const today = new Date().toISOString().split('T')[0];
+    const durationMinutes = duration ? parseInt(duration) : undefined;
 
     if (editData) {
       BookStorage.update(editData.id, {
@@ -67,20 +68,40 @@ export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalP
         bookType: bookType || undefined,
         readingStatus,
         progress: progress || undefined,
-        duration: duration ? parseInt(duration) : undefined,
+        duration: durationMinutes,
         note: note || undefined
       });
     } else {
-      BookStorage.add({
+      // 添加读书记录
+      const bookRecord = BookStorage.add({
         bookName,
         author: author || undefined,
         bookType: bookType || undefined,
         readingStatus,
         progress: progress || undefined,
-        duration: duration ? parseInt(duration) : undefined,
+        duration: durationMinutes,
         note: note || undefined,
         date: today
       });
+
+      // 自动创建时间记录，分类为学习成长-认知提升-阅读
+      if (durationMinutes) {
+        const now = new Date();
+        const startTime = new Date(now.getTime() - durationMinutes * 60000);
+        TimeStorage.add({
+          title: `阅读：${bookName}`,
+          firstCategory: '学习成长',
+          secondCategory: '认知提升',
+          date: today,
+          startTime: startTime.toISOString(),
+          endTime: now.toISOString(),
+          duration: durationMinutes,
+          isPlanned: false,
+          isCompleted: true,
+          note: note || undefined,
+          tags: ['阅读', bookRecord.id]
+        });
+      }
     }
 
     onSaved();
@@ -100,8 +121,17 @@ export function BookRecordModal({ onClose, onSaved, editData }: BookRecordModalP
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* 功能按钮区 - 仅保留快捷模板 */}
+          {/* 功能按钮区 */}
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="flex-1 opacity-50 cursor-not-allowed"
+              title="微信读书导入功能暂未开放"
+            >
+              微信读书导入
+            </Button>
             <Button
               variant="outline"
               size="sm"

@@ -333,7 +333,7 @@ export function TodoModal({ open, onOpenChange, todo, onSave, defaultDate }: Tod
 
           {/* 6. 起止时间（固定时段时显示） */}
           {taskTimeType === 'fixedTime' && planLevel === 'today' && (
-            <div className="grid grid-cols-2 gap-3 space-y-0">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>开始时间</Label>
                 <Input

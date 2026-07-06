@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Droplets } from 'lucide-react';
+import { Plus, Book, Dumbbell, Wallet, Check, Trash2, Droplets, Edit } from 'lucide-react';
 import { TodoStorage, HabitStorage, PlanStorage, TimeStorage } from '@/lib/storage';
 import type { TodoItem, HabitRecord, FirstCategory, HabitType, DrinkType } from '@/types';
 import { getCategoryColor, HABIT_CONFIG, getSecondCategories } from '@/types';
@@ -309,6 +309,15 @@ export default function TodayPage() {
                     {todo.firstCategory} · {todo.secondCategory}
                   </div>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => handleEditTodo(todo)}
+                >
+                  <Edit className="h-3 w-3 text-muted-foreground" />
+                </Button>
 
                 <Button
                   variant="ghost"

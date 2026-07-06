@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { MonthSelector } from '@/components/calendar/month-selector';
 import { CalendarGrid } from '@/components/calendar/calendar-grid';
 import { DayDetailModal } from '@/components/calendar/day-detail-modal';
-import { TimeStorage, HabitStorage, AccountStorage } from '@/lib/storage';
-import type { TimeRecord, HabitRecord, AccountRecord, CalendarDay, FirstCategory } from '@/types';
+import { TimeStorage, HabitStorage, AccountStorage, BookStorage, FitnessStorage } from '@/lib/storage';
+import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, CalendarDay, FirstCategory } from '@/types';
 import { getCategoryColor, FIRST_CATEGORIES } from '@/types';
 
 type ViewMode = 'month' | 'quarter' | 'year';
@@ -16,6 +16,8 @@ export default function HomePage() {
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
   const [habitRecords, setHabitRecords] = useState<HabitRecord[]>([]);
   const [accountRecords, setAccountRecords] = useState<AccountRecord[]>([]);
+  const [bookRecords, setBookRecords] = useState<BookRecord[]>([]);
+  const [fitnessRecords, setFitnessRecords] = useState<FitnessRecord[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | null>(null);
@@ -30,6 +32,8 @@ export default function HomePage() {
     setTimeRecords(TimeStorage.getByDateRange(startDate, endDate));
     setHabitRecords(HabitStorage.getAll());
     setAccountRecords(AccountStorage.getAll());
+    setBookRecords(BookStorage.getAll());
+    setFitnessRecords(FitnessStorage.getAll());
   };
 
   useEffect(() => {
@@ -254,6 +258,8 @@ export default function HomePage() {
           timeRecords={timeRecords.filter(r => r.date === selectedDate)}
           habits={habitRecords.find(r => r.date === selectedDate) || null}
           accountRecords={accountRecords.filter(r => r.date === selectedDate)}
+          bookRecords={bookRecords.filter(r => r.date === selectedDate)}
+          fitnessRecords={fitnessRecords.filter(r => r.date === selectedDate)}
           onClose={() => setSelectedDate(null)}
         />
       )}

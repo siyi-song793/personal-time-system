@@ -596,19 +596,33 @@ export const TodoStorage = {
     // 待办完成状态变更联动
     if (updates.isCompleted !== undefined && updates.isCompleted !== beforeData.isCompleted) {
       if (updates.isCompleted) {
-        // 标记完成：自动生成时间记录
-        if (updated.startTime && updated.endTime) {
-          const startTime = new Date(updated.startTime);
-          const endTime = new Date(updated.endTime);
+        // 标记完成：自动生成时间记录（仅当有有效时间时）
+        if (updated.startTime && updated.endTime && updated.date) {
+          // 构造完整的日期时间字符串
+          const startDateTime = `${updated.date}T${updated.startTime}:00`;
+          const endDateTime = `${updated.date}T${updated.endTime}:00`;
+          const startTime = new Date(startDateTime);
+          const endTime = new Date(endDateTime);
+          
+          // 验证日期有效性
+          if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+            return null;
+          }
+          
           const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+          
+          // 时长必须为正数
+          if (duration <= 0) {
+            return null;
+          }
           
           const timeRecord = TimeStorage.add({
             title: updated.title,
             firstCategory: updated.firstCategory,
             secondCategory: updated.secondCategory,
             thirdCategory: updated.thirdCategory,
-            startTime: updated.startTime,
-            endTime: updated.endTime,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
             duration,
             date: updated.date,
             isPlanned: true,

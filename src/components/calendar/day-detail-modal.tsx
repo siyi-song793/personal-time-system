@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import type { TimeRecord, HabitRecord, AccountRecord, FirstCategory } from '@/types';
+import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, FirstCategory } from '@/types';
 import { getCategoryColor, HABIT_CONFIG } from '@/types';
 
 interface DayDetailModalProps {
@@ -11,6 +11,8 @@ interface DayDetailModalProps {
   timeRecords: TimeRecord[];
   habits: HabitRecord | null;
   accountRecords: AccountRecord[];
+  bookRecords: BookRecord[];
+  fitnessRecords: FitnessRecord[];
   onClose: () => void;
 }
 
@@ -19,6 +21,8 @@ export function DayDetailModal({
   timeRecords,
   habits,
   accountRecords,
+  bookRecords,
+  fitnessRecords,
   onClose
 }: DayDetailModalProps) {
   const formatDate = (dateStr: string) => {
@@ -162,6 +166,76 @@ export function DayDetailModal({
               })}
             </div>
           </div>
+
+          {/* 阅读记录 */}
+          {bookRecords.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                <span className="text-amber-500">📖</span> 阅读记录
+              </h4>
+              <div className="space-y-2">
+                {bookRecords.map(record => (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-2 p-2 bg-amber-500/5 rounded-[var(--radius-standard)]"
+                  >
+                    <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{record.bookName}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        {record.author && <span>{record.author}</span>}
+                        {record.progress && <span>进度: {record.progress}</span>}
+                        {record.duration && <span>{record.duration}分钟</span>}
+                      </div>
+                      {record.note && (
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                          {record.note}
+                        </div>
+                      )}
+                    </div>
+                    {record.readingStatus && (
+                      <Badge variant="outline" className="text-xs">
+                        {record.readingStatus === 'reading' ? '在读' : record.readingStatus === 'finished' ? '已读' : '想读'}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 健身记录 */}
+          {fitnessRecords.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                <span className="text-green-500">🏃</span> 健身记录
+              </h4>
+              <div className="space-y-2">
+                {fitnessRecords.map(record => (
+                  <div
+                    key={record.id}
+                    className="flex items-center gap-2 p-2 bg-green-500/5 rounded-[var(--radius-standard)]"
+                  >
+                    <div className="w-2 h-2 rounded-full flex-shrink-0 bg-green-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{record.trainingType}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        {record.duration && <span>{record.duration}分钟</span>}
+                        {record.calories && <span>{record.calories}kcal</span>}
+                        {record.distance && <span>{record.distance}km</span>}
+                        {record.sets && <span>{record.sets}组</span>}
+                      </div>
+                      {record.feeling && (
+                        <div className="text-xs text-muted-foreground truncate mt-0.5">
+                          感受: {record.feeling}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 记账记录 */}
           <div className="mb-4">

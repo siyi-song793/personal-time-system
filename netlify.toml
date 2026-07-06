@@ -1,24 +1,11 @@
 [build]
   command = "pnpm run build"
-  publish = ".next"
+  publish = "out"
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--version"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-[functions]
-  node_bundler = "esbuild"
-
-# 重定向规则
-[[redirects]]
-  from = "/_next/static/*"
-  to = "/_next/static/:splat"
-  status = 200
-  force = true
-
+# 重定向规则 - SPA路由支持
 [[redirects]]
   from = "/*"
   to = "/index.html"

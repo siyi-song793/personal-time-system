@@ -14,6 +14,7 @@ interface DayDetailModalProps {
   bookRecords: BookRecord[];
   fitnessRecords: FitnessRecord[];
   onClose: () => void;
+  onAddAccount?: () => void;
 }
 
 export function DayDetailModal({
@@ -23,7 +24,8 @@ export function DayDetailModal({
   accountRecords,
   bookRecords,
   fitnessRecords,
-  onClose
+  onClose,
+  onAddAccount
 }: DayDetailModalProps) {
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -309,6 +311,16 @@ export function DayDetailModal({
               </div>
             )}
           </div>
+
+          {/* 新增该日记账按钮 */}
+          {onAddAccount && (
+            <button
+              onClick={onAddAccount}
+              className="w-full py-2.5 text-sm font-medium text-primary bg-primary/10 rounded-[var(--radius-standard)] hover:bg-primary/20 transition-colors"
+            >
+              + 新增该日记账
+            </button>
+          )}
 
           {/* 只读提示 */}
           <div className="p-3 bg-muted/20 rounded-[var(--radius-standard)] text-center">

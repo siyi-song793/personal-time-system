@@ -20,6 +20,7 @@ interface AccountRecordModalProps {
     note?: string;
     tag?: AccountTag;
   };
+  initialDate?: string;
 }
 
 // 支付账户选项
@@ -35,7 +36,7 @@ const FIXED_MONTHLY_EXPENSES = [
   { label: '会员订阅', amount: 30, category: '娱乐购物' as ExpenseFirstCategory },
 ];
 
-export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecordModalProps) {
+export function AccountRecordModal({ onClose, onSaved, editData, initialDate }: AccountRecordModalProps) {
   const [type, setType] = useState<AccountType>(editData?.type || 'expense');
   const [firstCategory, setFirstCategory] = useState<string>(editData?.firstCategory || '饮食餐饮');
   const [secondCategory, setSecondCategory] = useState(editData?.secondCategory || '');
@@ -43,6 +44,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
   const [account, setAccount] = useState(editData?.account || '微信');
   const [note, setNote] = useState(editData?.note || '');
   const [tag, setTag] = useState<AccountTag>(editData?.tag || autoDetectTag(editData?.firstCategory || '饮食餐饮', editData?.note || ''));
+  const [recordDate, setRecordDate] = useState(editData ? '' : (initialDate || new Date().toISOString().split('T')[0]));
 
   const expenseCategories = Object.keys(EXPENSE_CATEGORIES) as ExpenseFirstCategory[];
   const incomeCategories = INCOME_CATEGORIES;
@@ -81,8 +83,6 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
   const handleSave = () => {
     if (!isValid) return;
 
-    const today = new Date().toISOString().split('T')[0];
-
     if (editData) {
       AccountStorage.update(editData.id, {
         type,
@@ -95,7 +95,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
       });
     } else {
       AccountStorage.add({
-        date: today,
+        date: recordDate,
         type,
         firstCategory: firstCategory as ExpenseFirstCategory | IncomeCategory,
         secondCategory: secondCategory || undefined,
@@ -128,6 +128,19 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
         </DialogHeader>
 
         <div className="space-y-5 py-2">
+          {/* 记账日期 */}
+          {!editData && (
+            <div>
+              <label className="text-sm font-medium mb-2 block text-foreground/80">记账日期</label>
+              <input
+                type="date"
+                value={recordDate}
+                onChange={(e) => setRecordDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-input rounded-[var(--radius-small)] bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          )}
+
           {/* 收支类型 */}
           <div>
             <label className="text-sm font-medium mb-2 block text-foreground/80">收支类型 *</label>

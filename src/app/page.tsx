@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MonthSelector } from '@/components/calendar/month-selector';
 import { CalendarGrid } from '@/components/calendar/calendar-grid';
 import { DayDetailModal } from '@/components/calendar/day-detail-modal';
+import { MonthlyAccountModal } from '@/components/modals/monthly-account-modal';
+import { AccountRecordModal } from '@/components/modals/account-record-modal';
 import { TimeStorage, HabitStorage, AccountStorage, BookStorage, FitnessStorage } from '@/lib/storage';
 import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, CalendarDay, FirstCategory } from '@/types';
 import { getCategoryColor, FIRST_CATEGORIES } from '@/types';
@@ -22,6 +24,12 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | null>(null);
   const [showReview, setShowReview] = useState(false);
+  const [showMonthlyAccount, setShowMonthlyAccount] = useState(false);
+  const [longPressDate, setLongPressDate] = useState<string | null>(null);
+  const [showLongPressMenu, setShowLongPressMenu] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountModalDate, setAccountModalDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const loadData = () => {
     const year = currentDate.getFullYear();
@@ -173,7 +181,10 @@ export default function HomePage() {
           <span>🏃‍♂️</span>
           <span>健身</span>
         </button>
-        <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium hover:bg-blue-500/20 transition-colors">
+        <button 
+          onClick={() => setShowMonthlyAccount(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full text-xs font-medium hover:bg-blue-500/20 transition-colors"
+        >
           <span>💰</span>
           <span>记账</span>
         </button>
@@ -191,9 +202,43 @@ export default function HomePage() {
           currentMonth={currentDate.getMonth()}
           currentYear={currentDate.getFullYear()}
           onDayClick={handleDayClick}
+          onDayLongPress={(date) => {
+            setLongPressDate(date);
+            setShowLongPressMenu(true);
+          }}
           selectedCategory={selectedCategory}
         />
       </div>
+
+      {/* 长按菜单 */}
+      {showLongPressMenu && longPressDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowLongPressMenu(false)}>
+          <div className="bg-card rounded-[var(--radius-standard)] p-4 shadow-lg min-w-[200px]" onClick={e => e.stopPropagation()}>
+            <div className="text-sm font-medium mb-3 text-center">{longPressDate}</div>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setShowLongPressMenu(false);
+                  setSelectedDate(longPressDate);
+                }}
+                className="w-full py-2 px-4 text-sm text-left rounded-[var(--radius-small)] hover:bg-accent transition-colors"
+              >
+                查看当日详情
+              </button>
+              <button
+                onClick={() => {
+                  setShowLongPressMenu(false);
+                  setAccountModalDate(longPressDate);
+                  setShowAccountModal(true);
+                }}
+                className="w-full py-2 px-4 text-sm text-left rounded-[var(--radius-small)] hover:bg-accent transition-colors"
+              >
+                新增当日记账
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 图例说明 */}
       <div className="mt-4 p-3 bg-muted/30 rounded-[var(--radius-standard)]">
@@ -261,6 +306,32 @@ export default function HomePage() {
           bookRecords={bookRecords.filter(r => r.date === selectedDate)}
           fitnessRecords={fitnessRecords.filter(r => r.date === selectedDate)}
           onClose={() => setSelectedDate(null)}
+          onAddAccount={() => {
+            setAccountModalDate(selectedDate);
+            setShowAccountModal(true);
+            setSelectedDate(null);
+          }}
+        />
+      )}
+
+      {/* 月度记账汇总弹窗 */}
+      <MonthlyAccountModal
+        open={showMonthlyAccount}
+        onOpenChange={setShowMonthlyAccount}
+        records={accountRecords}
+        currentMonth={currentDate}
+        onRecordClick={(date) => setSelectedDate(date)}
+      />
+
+      {/* 新增记账弹窗 */}
+      {showAccountModal && (
+        <AccountRecordModal
+          onClose={() => setShowAccountModal(false)}
+          onSaved={() => {
+            setShowAccountModal(false);
+            loadData();
+          }}
+          initialDate={accountModalDate}
         />
       )}
     </div>

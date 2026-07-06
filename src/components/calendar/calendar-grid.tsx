@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { CalendarDay, FirstCategory } from '@/types';
 import { getCategoryColor } from '@/types';
@@ -9,6 +10,7 @@ interface CalendarGridProps {
   currentMonth: number;
   currentYear: number;
   onDayClick: (date: string) => void;
+  onDayLongPress?: (date: string) => void;
   selectedCategory?: FirstCategory | null;
 }
 
@@ -19,8 +21,12 @@ export function CalendarGrid({
   currentMonth,
   currentYear,
   onDayClick,
+  onDayLongPress,
   selectedCategory
 }: CalendarGridProps) {
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPress = useRef(false);
+
   // 计算日期的活跃度（基于时间记录时长）
   const getActivityLevel = (day: CalendarDay): number => {
     if (!day.timeRecords || day.timeRecords.length === 0) return 0;
@@ -90,7 +96,48 @@ export function CalendarGrid({
           return (
             <button
               key={index}
-              onClick={() => day.date && onDayClick(day.date)}
+              onClick={() => {
+                if (!isLongPress.current && day.date) {
+                  onDayClick(day.date);
+                }
+                isLongPress.current = false;
+              }}
+              onMouseDown={() => {
+                if (day.date && onDayLongPress) {
+                  isLongPress.current = false;
+                  longPressTimer.current = setTimeout(() => {
+                    isLongPress.current = true;
+                    onDayLongPress(day.date!);
+                  }, 500);
+                }
+              }}
+              onMouseUp={() => {
+                if (longPressTimer.current) {
+                  clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                }
+              }}
+              onMouseLeave={() => {
+                if (longPressTimer.current) {
+                  clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                }
+              }}
+              onTouchStart={() => {
+                if (day.date && onDayLongPress) {
+                  isLongPress.current = false;
+                  longPressTimer.current = setTimeout(() => {
+                    isLongPress.current = true;
+                    onDayLongPress(day.date!);
+                  }, 500);
+                }
+              }}
+              onTouchEnd={() => {
+                if (longPressTimer.current) {
+                  clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                }
+              }}
               disabled={!day.isCurrentMonth}
               className={cn(
                 'relative aspect-square rounded-[var(--radius-small)] flex flex-col items-center justify-center gap-0.5 transition-all',

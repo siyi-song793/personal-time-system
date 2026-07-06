@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DRINK_TYPES, type DrinkType } from '@/types';
 
@@ -44,11 +43,8 @@ export function WaterRecordModal({ open, onOpenChange, onConfirm, currentAmount 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b">
+        <DialogHeader className="pb-3 border-b">
           <DialogTitle className="text-base font-medium">记录饮水</DialogTitle>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenChange(false)}>
-            <X className="h-4 w-4" />
-          </Button>
         </DialogHeader>
 
         <div className="space-y-4 py-3">

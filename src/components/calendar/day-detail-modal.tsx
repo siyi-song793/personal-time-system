@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, FirstCategory } from '@/types';
+import type { TimeRecord, HabitRecord, AccountRecord, BookRecord, FitnessRecord, FirstCategory, WaterDrink } from '@/types';
 import { getCategoryColor, HABIT_CONFIG } from '@/types';
 
 interface DayDetailModalProps {
@@ -167,6 +167,27 @@ export function DayDetailModal({
             </div>
           </div>
 
+          {/* 饮水分时段明细 */}
+          {habits && habits.water.drinks && habits.water.drinks.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-medium mb-2">饮水明细</h4>
+              <div className="grid grid-cols-4 gap-2">
+                {getTimePeriods(habits.water.drinks).map(period => (
+                  <div
+                    key={period.key}
+                    className="p-2 rounded-[var(--radius-standard)] text-center"
+                    style={{ backgroundColor: period.color }}
+                  >
+                    <div className="text-xs font-medium text-foreground/80">{period.label}</div>
+                    <div className="text-sm font-bold text-foreground mt-1">
+                      {period.totalMl > 0 ? `${period.totalMl}ml` : '0ml'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 阅读记录 */}
           {bookRecords.length > 0 && (
             <div className="mb-4">
@@ -299,4 +320,23 @@ export function DayDetailModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+// 时段配置
+const TIME_PERIOD_CONFIG = [
+  { key: 'dawn', label: '凌晨', start: 0, end: 6, color: '#E8E8E8' },
+  { key: 'morning', label: '上午', start: 7, end: 11, color: '#cce5ff' },
+  { key: 'afternoon', label: '中午', start: 12, end: 17, color: '#fff2cc' },
+  { key: 'evening', label: '晚上', start: 18, end: 23, color: '#e5ccff' },
+] as const;
+
+function getTimePeriods(drinks: WaterDrink[]) {
+  return TIME_PERIOD_CONFIG.map(period => {
+    const periodDrinks = drinks.filter(d => {
+      const hour = parseInt(d.time.split(':')[0], 10);
+      return hour >= period.start && hour <= period.end;
+    });
+    const totalMl = periodDrinks.reduce((sum, d) => sum + d.amount, 0);
+    return { ...period, drinks: periodDrinks, totalMl };
+  });
 }

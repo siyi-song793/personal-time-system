@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
-import { TimeStorage } from '@/lib/storage';
-import type { TimeRecord, FirstCategory } from '@/types';
-import { getCategoryColor, FIRST_CATEGORIES } from '@/types';
+import { TimeStorage, HabitStorage } from '@/lib/storage';
+import type { TimeRecord, FirstCategory, HabitRecord, WaterDrink } from '@/types';
+import { getCategoryColor, FIRST_CATEGORIES, HABIT_CONFIG } from '@/types';
 
 export default function TimelinePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeRecords, setTimeRecords] = useState<TimeRecord[]>([]);
+  const [habitRecord, setHabitRecord] = useState<HabitRecord | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<FirstCategory | 'all'>('all');
   const [isClient, setIsClient] = useState(false);
 
@@ -26,11 +27,16 @@ export default function TimelinePage() {
     const dateStr = currentDate.toISOString().split('T')[0];
     const records = TimeStorage.getByDate(dateStr);
     setTimeRecords(records);
+    const habit = HabitStorage.getByDate(dateStr);
+    setHabitRecord(habit);
   };
 
+  // 过滤掉饮水记录（饮水在底部独立板块展示）
+  const nonWaterRecords = timeRecords.filter(r => r.secondCategory !== '饮水');
+
   const filteredRecords = selectedCategory === 'all'
-    ? timeRecords
-    : timeRecords.filter(r => r.firstCategory === selectedCategory);
+    ? nonWaterRecords
+    : nonWaterRecords.filter(r => r.firstCategory === selectedCategory);
 
   // 按开始时间排序
   const sortedRecords = [...filteredRecords].sort((a, b) => 
@@ -220,12 +226,121 @@ export default function TimelinePage() {
         </div>
       </div>
 
+      {/* 今日饮水汇总板块 */}
+      {habitRecord && habitRecord.water.drinks && habitRecord.water.drinks.length > 0 && (
+        selectedCategory === 'all' || selectedCategory === '生活日常'
+      ) && (
+        <WaterSummarySection drinks={habitRecord.water.drinks || []} goal={HABIT_CONFIG.water.target} />
+      )}
+
       {/* 只读提示 */}
       <div className="mt-4 p-3 bg-muted/20 rounded-[var(--radius-standard)] text-center">
         <p className="text-xs text-muted-foreground">
           时间轴为只读视图，添加记录请前往「今日待办」页面
         </p>
       </div>
+    </div>
+  );
+}
+
+// 时段配置
+const TIME_PERIODS = [
+  { key: 'dawn', label: '凌晨', start: 0, end: 6, color: '#E8E8E8' },
+  { key: 'morning', label: '上午', start: 7, end: 11, color: '#cce5ff' },
+  { key: 'afternoon', label: '中午', start: 12, end: 17, color: '#fff2cc' },
+  { key: 'evening', label: '晚上', start: 18, end: 23, color: '#e5ccff' },
+] as const;
+
+type TimePeriodKey = typeof TIME_PERIODS[number]['key'];
+
+function getTimePeriod(time: string): TimePeriodKey {
+  const hour = parseInt(time.split(':')[0], 10);
+  if (hour >= 0 && hour <= 6) return 'dawn';
+  if (hour >= 7 && hour <= 11) return 'morning';
+  if (hour >= 12 && hour <= 17) return 'afternoon';
+  return 'evening';
+}
+
+function WaterSummarySection({ drinks, goal }: { drinks: WaterDrink[]; goal: number }) {
+  const [expandedPeriods, setExpandedPeriods] = useState<Set<TimePeriodKey>>(new Set());
+
+  const togglePeriod = (key: TimePeriodKey) => {
+    setExpandedPeriods(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // 按时段分组
+  const periodData = TIME_PERIODS.map(period => {
+    const periodDrinks = drinks.filter(d => getTimePeriod(d.time) === period.key);
+    const totalMl = periodDrinks.reduce((sum, d) => sum + d.amount, 0);
+    return { ...period, drinks: periodDrinks, totalMl };
+  });
+
+  const totalMl = drinks.reduce((sum, d) => sum + d.amount, 0);
+  const progress = Math.min((totalMl / goal) * 100, 100);
+
+  return (
+    <div className="mt-4 bg-card rounded-[var(--radius-standard)] shadow-[var(--shadow-global)] overflow-hidden">
+      {/* 顶部总览 */}
+      <div className="p-3 border-b">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium">今日饮水</span>
+          <span className="text-sm text-muted-foreground">
+            总{totalMl}ml / 目标{goal}ml
+          </span>
+        </div>
+        <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-habit-water transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 四时段横向均分 */}
+      <div className="grid grid-cols-4 divide-x">
+        {periodData.map(period => (
+          <div
+            key={period.key}
+            className="p-2 text-center cursor-pointer hover:opacity-80 transition-opacity"
+            style={{ backgroundColor: period.color }}
+            onClick={() => period.drinks.length > 0 && togglePeriod(period.key)}
+          >
+            <div className="text-xs font-medium text-foreground/80">{period.label}</div>
+            <div className="text-sm font-bold text-foreground mt-1">
+              {period.totalMl > 0 ? `${period.totalMl}ml` : '0ml'}
+            </div>
+            {period.drinks.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {expandedPeriods.has(period.key) ? '收起' : `${period.drinks.length}条`}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* 展开的明细列表 */}
+      {Array.from(expandedPeriods).map(periodKey => {
+        const period = periodData.find(p => p.key === periodKey);
+        if (!period || period.drinks.length === 0) return null;
+        return (
+          <div key={periodKey} className="px-3 py-2 border-t bg-muted/10">
+            <div className="text-xs font-medium mb-1">{period.label}明细</div>
+            <div className="space-y-1">
+              {period.drinks.map(drink => (
+                <div key={drink.id} className="flex items-center justify-between text-xs">
+                  <span>{drink.type}</span>
+                  <span className="text-muted-foreground">{drink.amount}ml</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

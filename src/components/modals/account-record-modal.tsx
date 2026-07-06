@@ -137,7 +137,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
                 className={`flex-1 py-2.5 text-sm rounded-[var(--radius-capsule)] transition-all font-medium ${
                   type === 'expense'
                     ? 'bg-account-expense text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground/80'
+                    : 'text-foreground/70 hover:text-foreground/90'
                 }`}
               >
                 支出
@@ -147,7 +147,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
                 className={`flex-1 py-2.5 text-sm rounded-[var(--radius-capsule)] transition-all font-medium ${
                   type === 'income'
                     ? 'bg-account-income text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground/80'
+                    : 'text-foreground/70 hover:text-foreground/90'
                 }`}
               >
                 收入
@@ -231,7 +231,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
                     className={`flex-1 py-2.5 text-xs rounded-[var(--radius-pill)] transition-all font-medium ${
                       tag === t
                         ? 'text-white shadow-sm'
-                        : 'bg-muted/50 text-muted-foreground hover:bg-muted/80'
+                        : 'bg-muted/50 text-foreground/70 hover:bg-muted/80'
                     }`}
                     style={tag === t ? { backgroundColor: tagColors[t] } : {}}
                   >
@@ -262,7 +262,7 @@ export function AccountRecordModal({ onClose, onSaved, editData }: AccountRecord
                   <button
                     key={template.label}
                     onClick={() => applyFixedExpense(template)}
-                    className="px-3 py-1.5 text-xs rounded-[var(--radius-pill)] bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground/80 transition-all"
+                    className="px-3 py-1.5 text-xs rounded-[var(--radius-pill)] bg-muted/50 text-foreground/70 hover:bg-muted/80 hover:text-foreground/90 transition-all"
                   >
                     {template.label} ¥{template.amount}
                   </button>

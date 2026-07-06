@@ -245,7 +245,8 @@ export default function TodayPage() {
         <TodoModal
           open={showAddTodo}
           onOpenChange={setShowAddTodo}
-          onSave={() => {
+          onSave={(data) => {
+            TodoStorage.add(data);
             setShowAddTodo(false);
             loadData();
           }}

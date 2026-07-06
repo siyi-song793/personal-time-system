@@ -1,16 +1,5 @@
 #!/bin/bash
-set -Eeuo pipefail
+set -e
 
-COZE_WORKSPACE_PATH="${COZE_WORKSPACE_PATH:-$(pwd)}"
-
-PORT=5000
-DEPLOY_RUN_PORT="${DEPLOY_RUN_PORT:-$PORT}"
-
-start_service() {
-    cd "${COZE_WORKSPACE_PATH}"
-    echo "Starting static file server on port ${DEPLOY_RUN_PORT}..."
-    npx serve out -l ${DEPLOY_RUN_PORT} -s --no-clipboard
-}
-
-echo "Starting static file server on port ${DEPLOY_RUN_PORT}..."
-start_service
+# Start static file server for the 'out' directory
+node dist/static-server.js

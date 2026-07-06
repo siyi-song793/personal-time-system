@@ -1,14 +1,13 @@
 #!/bin/bash
-set -Eeuo pipefail
-
-COZE_WORKSPACE_PATH="${COZE_WORKSPACE_PATH:-$(pwd)}"
-
-cd "${COZE_WORKSPACE_PATH}"
+set -e
 
 echo "Installing dependencies..."
-pnpm install --prefer-frozen-lockfile --prefer-offline --loglevel debug --reporter=append-only
+pnpm install
 
-echo "Building the Next.js project (static export)..."
+echo "Building static site..."
 pnpm next build
+
+echo "Building static server..."
+pnpm tsup src/static-server.ts --format cjs --out-dir dist --clean=false
 
 echo "Build completed successfully! Static files in 'out/' directory."
